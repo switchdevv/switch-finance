@@ -1,1 +1,338 @@
-@import "tailwindcss";
+/* @heroui/styles' own index.css already imports "tailwindcss" (and tw-animate-css)
+   internally — importing it again here would double every Tailwind base rule and
+   @property registration. This one import is the documented "Basic Setup" for the
+   full bundle; only hand-roll the tailwindcss import if pulling individual
+   @heroui/styles/components/*.css files instead of the whole package. */
+@import "@heroui/styles";
+
+@theme {
+  --font-sans: var(--font-proxima), ui-sans-serif, system-ui, sans-serif;
+
+  /* Only two weights exist in Proxima Nova (see src/fonts/index.ts) — point the
+     intermediate weights HeroUI's internals may reach for at the real bold face
+     instead of letting the browser synthesize one. Stick to font-normal/font-bold. */
+  --font-weight-medium: 700;
+  --font-weight-semibold: 700;
+
+  /* switch-manager's Text.js size scale (ui/Text/Text.js), ported 1:1 as px. */
+  --text-h1: 34px;
+  --text-h2: 30px;
+  --text-h3: 26px;
+  --text-h4: 22px;
+  --text-h5: 18px;
+  --text-h6: 16px;
+  --text-body: 14px;
+  --text-caption: 12px;
+  --text-micro: 11px;
+
+  --radius-card: 18px;
+  --radius-pill: 999px;
+
+  /* Indirected through a second variable on purpose: Tailwind inlines a @theme
+     shadow's literal value into the utility at build time, so a light/dark pair
+     written directly here would bake the light one in and the .dark override would
+     never fire. Pointing at --card-shadow keeps the lookup at runtime. */
+  --shadow-card: var(--card-shadow);
+  --shadow-raised: var(--raised-shadow);
+  --shadow-accent: 0 6px 20px -8px var(--accent-shadow);
+}
+
+/* ---------------------------------------------------------------------------
+   Palette. Every value is oklch so light/dark pairs can be tuned by moving
+   lightness alone while hue and chroma (the brand's identity) stay put.
+   The brand hue is 174 — the green of switch-manager's #0d918c, pushed up in
+   chroma so it reads as a saturated emerald rather than a desaturated teal.
+
+   Both blocks live in one @layer base, light first then dark, so our dark block
+   beats our light block while both still beat HeroUI's own :root/.dark defaults —
+   a bare :root written after the @import above would tie with HeroUI's .dark on
+   specificity and lose on source order, silently breaking dark mode.
+   --------------------------------------------------------------------------- */
+@layer base {
+  :root {
+    color-scheme: light;
+
+    /* Brand ramp — the one place the green is defined. Everything accent-flavoured
+       below (soft chips, gradients, focus rings, glows) is derived from these. */
+    --brand-50: oklch(0.975 0.022 174);
+    --brand-100: oklch(0.945 0.045 174);
+    --brand-200: oklch(0.895 0.078 174);
+    --brand-300: oklch(0.82 0.108 174);
+    --brand-400: oklch(0.735 0.13 174);
+    --brand-500: oklch(0.645 0.135 174);
+    --brand-600: oklch(0.565 0.122 175);
+    --brand-700: oklch(0.475 0.1 176);
+    --brand-800: oklch(0.39 0.08 177);
+    --brand-900: oklch(0.3 0.06 178);
+
+    /* Secondary hue used only as the far end of brand gradients — a lime-green that
+       keeps the gradient inside the brand family instead of veering to a second
+       identity colour. */
+    --brand-lime: oklch(0.83 0.175 145);
+
+    --background: oklch(0.981 0.005 174);
+    --foreground: oklch(0.235 0.016 250);
+
+    --surface: oklch(1 0 0);
+    --surface-foreground: var(--foreground);
+    --surface-secondary: oklch(0.968 0.006 200);
+    --surface-secondary-foreground: var(--foreground);
+    --surface-tertiary: oklch(0.945 0.008 200);
+    --surface-tertiary-foreground: var(--foreground);
+
+    --overlay: oklch(1 0 0);
+    --overlay-foreground: var(--foreground);
+
+    --muted: oklch(0.555 0.017 245);
+
+    --accent: var(--brand-600);
+    --accent-foreground: oklch(1 0 0);
+    --accent-shadow: oklch(0.565 0.122 175 / 0.35);
+
+    --success: oklch(0.63 0.145 152);
+    --success-foreground: oklch(1 0 0);
+    --warning: oklch(0.72 0.16 62);
+    --warning-foreground: oklch(0.24 0.03 62);
+    --danger: oklch(0.585 0.21 22);
+    --danger-foreground: oklch(1 0 0);
+
+    --default: oklch(0.955 0.005 220);
+    --default-foreground: oklch(0.34 0.015 245);
+
+    /* Soft pairs are written out rather than left to HeroUI's color-mix defaults:
+       mixing a mid-lightness hue into a tint produces a label that fails contrast on
+       warning/success, which is exactly where status chips live. */
+    --default-soft: oklch(0.955 0.005 220);
+    --default-soft-foreground: oklch(0.42 0.014 245);
+    --default-soft-hover: oklch(0.93 0.006 220);
+
+    --accent-soft: var(--brand-100);
+    --accent-soft-foreground: var(--brand-700);
+    --accent-soft-hover: var(--brand-200);
+
+    --success-soft: oklch(0.945 0.05 152);
+    --success-soft-foreground: oklch(0.455 0.115 154);
+    --success-soft-hover: oklch(0.915 0.07 152);
+
+    --warning-soft: oklch(0.955 0.055 75);
+    --warning-soft-foreground: oklch(0.495 0.115 58);
+    --warning-soft-hover: oklch(0.925 0.08 75);
+
+    --danger-soft: oklch(0.95 0.03 22);
+    --danger-soft-foreground: oklch(0.505 0.185 25);
+    --danger-soft-hover: oklch(0.92 0.05 22);
+
+    --field-background: oklch(1 0 0);
+    --field-foreground: var(--foreground);
+    --field-placeholder: oklch(0.66 0.014 245);
+    --field-border: oklch(0.885 0.009 235);
+    --field-border-hover: oklch(0.8 0.014 235);
+    --field-border-focus: var(--brand-500);
+    --field-focus: oklch(1 0 0);
+
+    --segment: oklch(0.945 0.006 220);
+    --segment-foreground: var(--foreground);
+
+    --border: oklch(0.915 0.007 230);
+    --border-secondary: oklch(0.885 0.009 230);
+    --separator: oklch(0.935 0.006 230);
+    --separator-secondary: oklch(0.915 0.007 230);
+    --separator-tertiary: oklch(0.945 0.005 230);
+    --link: var(--brand-600);
+    --focus: var(--brand-500);
+
+    /* Layered, low-opacity shadows — one ambient + one contact — so a card reads as
+       lifted instead of getting a single hard grey halo. */
+    --card-shadow: 0 1px 2px -1px rgb(16 24 32 / 0.06), 0 4px 16px -6px rgb(16 24 32 / 0.1);
+    --raised-shadow: 0 2px 4px -2px rgb(16 24 32 / 0.08), 0 12px 32px -12px rgb(16 24 32 / 0.18);
+
+    /* Ambient page glows — see the body::before rule below. */
+    --glow-a: oklch(0.645 0.135 174 / 0.16);
+    --glow-b: oklch(0.83 0.175 145 / 0.12);
+  }
+
+  .dark,
+  [data-theme='dark'] {
+    color-scheme: dark;
+
+    --background: oklch(0.175 0.011 220);
+    --foreground: oklch(0.975 0.004 220);
+
+    --surface: oklch(0.222 0.012 220);
+    --surface-foreground: var(--foreground);
+    --surface-secondary: oklch(0.262 0.013 220);
+    --surface-secondary-foreground: var(--foreground);
+    --surface-tertiary: oklch(0.3 0.014 220);
+    --surface-tertiary-foreground: var(--foreground);
+
+    --overlay: oklch(0.245 0.013 220);
+    --overlay-foreground: var(--foreground);
+
+    --muted: oklch(0.705 0.016 225);
+
+    /* Brighter accent on dark, with a near-black foreground: a mid-tone green under
+       white text is the classic dark-mode contrast failure, and the inverted pairing
+       is both readable and what modern dark UIs actually do. */
+    --accent: var(--brand-400);
+    --accent-foreground: oklch(0.19 0.035 176);
+    --accent-shadow: oklch(0.735 0.13 174 / 0.3);
+
+    --success: oklch(0.76 0.16 154);
+    --success-foreground: oklch(0.19 0.03 154);
+    --warning: oklch(0.81 0.15 72);
+    --warning-foreground: oklch(0.22 0.03 62);
+    --danger: oklch(0.66 0.195 23);
+    --danger-foreground: oklch(1 0 0);
+
+    --default: oklch(0.295 0.013 220);
+    --default-foreground: oklch(0.955 0.004 220);
+
+    --default-soft: oklch(0.3 0.012 220);
+    --default-soft-foreground: oklch(0.855 0.008 220);
+    --default-soft-hover: oklch(0.335 0.013 220);
+
+    --accent-soft: oklch(0.315 0.055 176);
+    --accent-soft-foreground: oklch(0.845 0.13 172);
+    --accent-soft-hover: oklch(0.36 0.07 176);
+
+    --success-soft: oklch(0.31 0.055 154);
+    --success-soft-foreground: oklch(0.855 0.145 154);
+    --success-soft-hover: oklch(0.355 0.07 154);
+
+    --warning-soft: oklch(0.325 0.06 68);
+    --warning-soft-foreground: oklch(0.865 0.135 78);
+    --warning-soft-hover: oklch(0.37 0.075 68);
+
+    --danger-soft: oklch(0.315 0.075 24);
+    --danger-soft-foreground: oklch(0.805 0.13 24);
+    --danger-soft-hover: oklch(0.36 0.095 24);
+
+    --field-background: oklch(0.2 0.011 220);
+    --field-foreground: var(--foreground);
+    --field-placeholder: oklch(0.61 0.014 225);
+    --field-border: oklch(0.345 0.015 220);
+    --field-border-hover: oklch(0.42 0.018 220);
+    --field-border-focus: var(--brand-400);
+    --field-focus: oklch(0.215 0.012 220);
+
+    --segment: oklch(0.29 0.013 220);
+    --segment-foreground: var(--foreground);
+
+    --border: oklch(0.305 0.013 220);
+    --border-secondary: oklch(0.355 0.015 220);
+    --separator: oklch(0.29 0.012 220);
+    --separator-secondary: oklch(0.32 0.013 220);
+    --separator-tertiary: oklch(0.275 0.012 220);
+    --link: var(--brand-300);
+    --focus: var(--brand-400);
+
+    --glow-a: oklch(0.645 0.135 174 / 0.2);
+    --glow-b: oklch(0.55 0.14 200 / 0.16);
+
+    /* HeroUI zeroes every shadow on dark ("no shadow on dark mode"), which flattens
+       cards against a near-black background. Restore a real one — dark UIs still
+       need depth, they just need it darker than the surface rather than greyer. */
+    --surface-shadow: 0 1px 2px -1px rgb(0 0 0 / 0.5), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+    --field-shadow: 0 0 0 0 transparent inset;
+    --card-shadow: 0 1px 2px -1px rgb(0 0 0 / 0.5), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+    --raised-shadow: 0 2px 6px -2px rgb(0 0 0 / 0.55), 0 18px 40px -18px rgb(0 0 0 / 0.7);
+  }
+
+  /* Global shape/metric overrides, applied to both schemes. */
+  :root,
+  .dark,
+  [data-theme='dark'] {
+    --radius: 0.625rem;
+    --field-radius: 0.75rem;
+    /* HeroUI ships form fields borderless (--field-border-width: 0px), which is why
+       the login inputs read as floating grey blocks. Give every field a real 1px
+       edge so its boundary is visible before focus, not only after. */
+    --field-border-width: 1px;
+    --ring-offset-width: 2px;
+  }
+
+  body {
+    /* Two soft brand glows anchored to the viewport. Fixed + -z-10 so they sit under
+       every surface without joining the scroll or creating a scrollbar. */
+    &::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: -10;
+      pointer-events: none;
+      background:
+        radial-gradient(60rem 40rem at 12% -10%, var(--glow-a), transparent 60%),
+        radial-gradient(50rem 36rem at 100% 0%, var(--glow-b), transparent 62%);
+    }
+  }
+
+  ::selection {
+    background-color: var(--accent-soft);
+    color: var(--accent-soft-foreground);
+  }
+
+  /* Numeric columns line up only if the digits share an advance width. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Brand gradient, used for the wordmark and the login card's rim light. */
+@utility brand-gradient {
+  background-image: linear-gradient(135deg, var(--brand-400) 0%, var(--brand-600) 55%, var(--brand-lime) 130%);
+}
+
+@utility brand-gradient-text {
+  background-image: linear-gradient(120deg, var(--brand-500), var(--brand-lime));
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+   Print — the invoice route.
+
+   The document is drawn in fixed light colours rather than theme tokens, because a
+   viewer in dark mode would otherwise print white text on a black page (or, with
+   backgrounds dropped by the browser, white on white). Everything here is about paper,
+   not about the screen.
+   --------------------------------------------------------------------------- */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* The ambient brand glow is decorative and would print as a grey smear. */
+  body::before {
+    display: none !important;
+  }
+
+  .invoice-sheet {
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Repeat the line-items header on every page — without this, page two of a busy
+     month is a column of unlabelled numbers. */
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  section,
+  footer {
+    break-inside: avoid;
+  }
+
+  /* Keep the fills the document relies on (table header band, totals rule). */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

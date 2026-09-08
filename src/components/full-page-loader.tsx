@@ -1,0 +1,16 @@
+import { Spinner } from '@heroui/react';
+import { BrandMark } from './brand-mark';
+
+/**
+ * Rendered while the session query is pending — see RequireAuth. Never rendered
+ * alongside the login form or dashboard content; that's what keeps first paint from
+ * flashing either one before the session is actually known.
+ */
+export function FullPageLoader() {
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-5">
+      <BrandMark className="size-12" />
+      <Spinner size="sm" color="accent" aria-label="Loading" />
+    </div>
+  );
+}
