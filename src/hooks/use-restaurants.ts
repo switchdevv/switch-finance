@@ -46,5 +46,9 @@ export function useRestaurant(objectId: string) {
   return useQuery({
     queryKey: queryKeys.restaurants.detail(objectId),
     queryFn: () => getRestaurant(objectId),
+    // The id comes from ?id= (see lib/url/routes.ts), so a truncated link can leave it
+    // empty — that's a dead URL, not a row to look up. Callers render their own message
+    // for it before ever reading this query's status.
+    enabled: objectId.length > 0,
   });
 }

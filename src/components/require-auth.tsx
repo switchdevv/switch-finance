@@ -19,7 +19,14 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isPending && !user) {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      // The query string is part of where the user was trying to go, not decoration:
+      // a restaurant is addressed as /restaurants/detail?id=… (see lib/url/routes.ts),
+      // so sending only the pathname through the login round-trip would land them on a
+      // detail page with no restaurant. Read from location rather than
+      // useSearchParams(), which would oblige every layout using this to sit inside a
+      // Suspense boundary; this only ever runs in the browser.
+      const target = pathname + window.location.search;
+      router.replace(`/login?next=${encodeURIComponent(target)}`);
     }
   }, [isPending, user, pathname, router]);
 

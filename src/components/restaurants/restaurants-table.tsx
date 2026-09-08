@@ -10,6 +10,7 @@ import {
   parseRestaurantFilters,
   restaurantFiltersToQuery,
 } from '@/lib/url/restaurant-filters';
+import { restaurantDetailHref } from '@/lib/url/routes';
 import {
   formatDate,
   formatNumber,
@@ -180,7 +181,7 @@ export function RestaurantsTable() {
                     </Table.Cell>
                     <Table.Cell>
                       <Link
-                        href={detailHref(restaurant.objectId, buildHref(page))}
+                        href={restaurantDetailHref(restaurant.objectId, buildHref(page))}
                         aria-label={`Open ${formatOrNone(restaurant.name)}`}
                         className="text-muted hover:bg-accent-soft hover:text-accent-soft-foreground focus-visible:ring-focus grid size-8 place-items-center rounded-lg transition-colors outline-none focus-visible:ring-2"
                       >
@@ -206,13 +207,6 @@ export function RestaurantsTable() {
   );
 }
 
-/** The detail page's back link is the directory exactly as the user left it — page and
- * every filter — rather than a bare page number, so returning from a restaurant doesn't
- * silently drop the search that found it. */
-function detailHref(objectId: string, backHref: string): string {
-  return `/restaurants/${objectId}?back=${encodeURIComponent(backHref)}`;
-}
-
 function NameCell({ restaurant, backHref }: { restaurant: Restaurant; backHref: string }) {
   const name = formatOrNone(restaurant.name);
 
@@ -221,7 +215,7 @@ function NameCell({ restaurant, backHref }: { restaurant: Restaurant; backHref: 
       <Thumbnail url={restaurant.picture?.url} name={restaurant.name} />
       <span className="flex min-w-0 flex-col">
         <Link
-          href={detailHref(restaurant.objectId, backHref)}
+          href={restaurantDetailHref(restaurant.objectId, backHref)}
           className="text-body hover:text-accent-soft-foreground truncate font-bold transition-colors"
         >
           {name}

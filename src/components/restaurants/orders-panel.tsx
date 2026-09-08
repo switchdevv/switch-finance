@@ -14,6 +14,7 @@ import { parseErrorMessage } from '@/lib/parse/errors';
 import { queryKeys } from '@/lib/query/keys';
 import { fetchProductNames } from '@/lib/services/foods';
 import type { OrderScope } from '@/lib/services/orders';
+import { restaurantInvoiceHref } from '@/lib/url/routes';
 import type { RestaurantWithRelations } from '@/types/restaurant';
 import { DateRangeToolbar } from '@/components/ui/date-range-toolbar';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -102,7 +103,7 @@ export function OrdersPanel({ restaurant }: { restaurant: RestaurantWithRelation
 
   const isPending = rangeQuery.status === 'pending';
 
-  const invoiceHref = `/restaurants/${restaurant.objectId}/invoice?from=${range.from}&to=${range.to}`;
+  const invoiceHref = restaurantInvoiceHref(restaurant.objectId, range);
 
   const onExport = async (fields: ExportFieldKey[]) => {
     if (!rangeQuery.data) return;

@@ -5,8 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "preview": "next build && firebase emulators:start --only hosting",
+    "lint": "eslint",
+    "deploy": "next build && firebase deploy --only hosting"
   },
   "dependencies": {
     "@heroui/react": "^3.2.4",

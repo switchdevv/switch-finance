@@ -12,6 +12,7 @@ import { parseErrorMessage } from '@/lib/parse/errors';
 import type { CurrencyCode } from '@/types/city';
 import type { OrderWithUser } from '@/types/order';
 import type { RestaurantWithRelations } from '@/types/restaurant';
+import { readRestaurantId } from '@/lib/url/routes';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { BrandMark } from '@/components/brand-mark';
 import { PrinterIcon } from '@/components/icons';
@@ -32,8 +33,9 @@ const MODES = [
   { key: 'statement' as const, label: 'Sales statement' },
 ];
 
-export function InvoiceDocument({ objectId }: { objectId: string }) {
+export function InvoiceDocument() {
   const searchParams = useSearchParams();
+  const objectId = readRestaurantId(searchParams);
   const from = searchParams.get('from');
   const to = searchParams.get('to');
   const [mode, setMode] = useState<Mode>(
@@ -48,6 +50,10 @@ export function InvoiceDocument({ objectId }: { objectId: string }) {
   const restaurant = restaurantQuery.data;
   const orders = useMemo(() => ordersQuery.data?.orders ?? [], [ordersQuery.data]);
   const totals = useMemo(() => computeTotals(orders, restaurant?.fee), [orders, restaurant?.fee]);
+
+  if (!objectId) {
+    return <p className="text-muted p-10 text-center">This invoice link is incomplete.</p>;
+  }
 
   if (restaurantQuery.status === 'error' || ordersQuery.status === 'error') {
     const error = restaurantQuery.error ?? ordersQuery.error;

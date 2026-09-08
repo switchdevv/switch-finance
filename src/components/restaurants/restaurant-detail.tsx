@@ -7,6 +7,7 @@ import { useRestaurant } from '@/hooks/use-restaurants';
 import { formatDateTime, formatNumber, formatOrNone, splitPhones } from '@/lib/format';
 import { parseErrorMessage } from '@/lib/parse/errors';
 import type { RestaurantWithRelations } from '@/types/restaurant';
+import { readRestaurantId, RESTAURANTS_HREF } from '@/lib/url/routes';
 import { StatusChip } from '@/components/ui/status-chip';
 import { OrdersPanel } from '@/components/restaurants/orders-panel';
 import {
@@ -18,11 +19,18 @@ import {
   StoreIcon,
 } from '@/components/icons';
 
-export function RestaurantDetail({ objectId }: { objectId: string }) {
+export function RestaurantDetail() {
   const searchParams = useSearchParams();
+  const objectId = readRestaurantId(searchParams);
   const backHref = safeBackHref(searchParams.get('back'));
 
   const { status, data: restaurant, error, refetch } = useRestaurant(objectId);
+
+  // A link that lost its ?id= can't be recovered from — same dead end as an id that no
+  // longer resolves, so it gets the same answer rather than a fetch for nothing.
+  if (!objectId) {
+    return <NotFound backHref={backHref} />;
+  }
 
   if (status === 'pending') {
     return (
@@ -57,20 +65,7 @@ export function RestaurantDetail({ objectId }: { objectId: string }) {
   // lib/parse/query.ts#findOne — so a bad objectId lands here, not in the error
   // branch above.
   if (!restaurant) {
-    return (
-      <div className="border-border/70 bg-surface rounded-card shadow-card flex flex-col items-center gap-3 border px-6 py-20 text-center">
-        <span className="bg-surface-secondary text-muted mb-1 grid size-12 place-items-center rounded-2xl">
-          <StoreIcon className="size-6" />
-        </span>
-        <Typography.Heading level={2} className="text-h5 font-bold">
-          Restaurant not found
-        </Typography.Heading>
-        <Typography.Paragraph className="text-muted text-body">
-          It may have been removed, or the link is incorrect.
-        </Typography.Paragraph>
-        <BackLink href={backHref} className="mt-2" />
-      </div>
-    );
+    return <NotFound backHref={backHref} />;
   }
 
   return (
@@ -94,13 +89,31 @@ export function RestaurantDetail({ objectId }: { objectId: string }) {
   );
 }
 
+function NotFound({ backHref }: { backHref: string }) {
+  return (
+    <div className="border-border/70 bg-surface rounded-card shadow-card flex flex-col items-center gap-3 border px-6 py-20 text-center">
+      <span className="bg-surface-secondary text-muted mb-1 grid size-12 place-items-center rounded-2xl">
+        <StoreIcon className="size-6" />
+      </span>
+      <Typography.Heading level={2} className="text-h5 font-bold">
+        Restaurant not found
+      </Typography.Heading>
+      <Typography.Paragraph className="text-muted text-body">
+        It may have been removed, or the link is incorrect.
+      </Typography.Paragraph>
+      <BackLink href={backHref} className="mt-2" />
+    </div>
+  );
+}
+
 /** The directory link the user arrived from, carrying their page and filters. Validated
  * as an in-app restaurants path rather than trusted: it's a query parameter, and a
  * `back` pointing anywhere else is either a broken link or someone playing. */
 function safeBackHref(raw: string | null): string {
-  if (!raw) return '/restaurants';
-  const decoded = decodeURIComponent(raw);
-  return decoded.startsWith('/restaurants') ? decoded : '/restaurants';
+  // No decodeURIComponent here: URLSearchParams has already done it exactly once, and a
+  // second pass would corrupt any filter value that legitimately contains a % sequence.
+  if (!raw) return RESTAURANTS_HREF;
+  return raw.startsWith(RESTAURANTS_HREF) ? raw : RESTAURANTS_HREF;
 }
 
 function Hero({ restaurant }: { restaurant: RestaurantWithRelations }) {

@@ -48,5 +48,7 @@ export function useOrdersInRange(restaurantId: string, range: DateRange) {
     queryFn: () => fetchOrdersInRange({ restaurantId, range, scope: 'billable' }),
     staleTime: 60_000,
     placeholderData: keepPreviousData,
+    // Matches useRestaurant: an invoice link that lost its ?id= has nothing to total.
+    enabled: restaurantId.length > 0,
   });
 }

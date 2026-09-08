@@ -7,10 +7,21 @@ import { useLogin, useSession } from '@/hooks/use-session';
 import { parseErrorMessage } from '@/lib/parse/errors';
 import { BrandMark } from '@/components/brand-mark';
 
+/** Where to go once signed in. Anything that isn't a single-slash-rooted in-app path is
+ * discarded: `next` is a query parameter, and `//evil.example` or `https://evil.example`
+ * would otherwise turn this form into an open redirect that carries Switch's branding
+ * right up to the moment the user leaves. */
+function safeNext(raw: string | null): string {
+  // Already decoded once by URLSearchParams — decoding again would unescape the target's
+  // own nested parameters (a detail link carries an encoded `back`) and break them.
+  if (!raw) return '/dashboard';
+  return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/dashboard';
+}
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') || '/dashboard';
+  const next = safeNext(searchParams.get('next'));
 
   const { data: user, isPending: sessionPending } = useSession();
   const login = useLogin();
