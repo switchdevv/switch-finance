@@ -1,9 +1,11 @@
 /**
- * Where the failing call came from — code 101 means something different in each:
- * an invalid login, or (on every other read) a missing/forbidden object. Never
- * return one global message for that code.
+ * Where the failing call came from — the same code means different things in each:
+ * 101 is an invalid login or (on every other read) a missing/forbidden object; 119 is a
+ * denied account at login and a denied *action* everywhere else; 141 is a rejected
+ * request generally, but on 'grant' it is specifically a cloud function that isn't
+ * deployed. Never return one global message for a code.
  */
-export type ErrorContext = 'login' | 'fetch';
+export type ErrorContext = 'login' | 'fetch' | 'grant';
 
 /** Maps a Parse.Error (or anything else a query might throw) to user-facing copy. */
 export function parseErrorMessage(error: unknown, context: ErrorContext): string {
@@ -17,9 +19,17 @@ export function parseErrorMessage(error: unknown, context: ErrorContext): string
         ? 'Invalid username or password.'
         : "You don't have permission to view this, or it no longer exists.";
     case 119:
+      if (context === 'login') return "This account doesn't have access to Switch Finance.";
+      if (context === 'grant') return 'Only admins can change access.';
       return "You don't have permission to do that.";
     case 141:
-      return 'The server rejected that request.';
+      // 141 is what Parse returns for a cloud function that isn't defined, which is the
+      // expected state of `setFinanceAccess` until the backend ships it (see
+      // docs/finance-access-backend.md). Naming the real cause beats "the server
+      // rejected that request", which reads as a bug in this app.
+      return context === 'grant'
+        ? 'Access changes aren\'t enabled on the server yet — ask the platform team to deploy `setFinanceAccess`.'
+        : 'The server rejected that request.';
     case 209:
       return 'Your session has expired. Please sign in again.';
     default:

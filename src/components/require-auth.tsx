@@ -2,8 +2,12 @@
 
 import { useEffect, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { Button } from '@heroui/react';
 import { useSession } from '@/hooks/use-session';
+import { useAccess } from '@/hooks/use-access';
+import { parseErrorMessage } from '@/lib/parse/errors';
 import { FullPageLoader } from './full-page-loader';
+import { NotAuthorized } from './not-authorized';
 
 /**
  * UX gate, not a security boundary — the session lives in localStorage, which a
@@ -11,9 +15,19 @@ import { FullPageLoader } from './full-page-loader';
  * anonymous), so this can only run client-side, after the bundle has already
  * loaded. Real protection is the Parse ACL/CLP on the backend: a request without a
  * valid session token is rejected there regardless of what this component renders.
+ *
+ * The same caveat applies to the role check below, and more sharply: until the backend
+ * ships the `beforeSave` trigger in docs/finance-access-backend.md, any account can write
+ * `financeAccess` onto its own row, so this gate keeps the wrong people *out of the UI*
+ * without yet keeping them out of the data. That trigger is what turns it into a boundary.
+ *
+ * Both layouts mount this component (app/(dashboard) and app/(print)), and the check
+ * lives here rather than in either of them so the print routes can't become the way
+ * around it — an invoice URL is a guessable query string, not a secret.
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { data: user, isPending } = useSession();
+  const access = useAccess();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -30,13 +44,31 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     }
   }, [isPending, user, pathname, router]);
 
-  if (isPending || !user) {
+  if (isPending || !user || access.isPending) {
     return <FullPageLoader />;
   }
 
-  // future: if (!isAuthorized(user)) return <NotAuthorized />; — user.get('appType')
-  // is already available on the session object above, so a role gate is one
-  // predicate here and no additional plumbing.
+  // A failed check is not a denial. The access row is read over the network, so this
+  // branch is a dropped connection or a CLP change — telling someone they have no access
+  // when the truth is "we couldn't ask" sends them to an admin for a problem an admin
+  // can't fix. Offer the retry instead.
+  if (access.isError) {
+    return (
+      <NotAuthorized
+        title="Couldn't verify your access"
+        description={parseErrorMessage(access.error, 'fetch')}
+        action={
+          <Button variant="primary" size="sm" onPress={access.refetch}>
+            Try again
+          </Button>
+        }
+      />
+    );
+  }
+
+  if (access.role === null) {
+    return <NotAuthorized />;
+  }
 
   return <>{children}</>;
 }

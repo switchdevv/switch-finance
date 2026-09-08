@@ -5,19 +5,25 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button, Tooltip } from '@heroui/react';
 import { useSession, useLogout } from '@/hooks/use-session';
+import { useAccess } from '@/hooks/use-access';
+import { ROLE_LABELS } from '@/lib/auth/access';
 import { BrandMark } from './brand-mark';
-import { DashboardIcon, LogOutIcon, StoreIcon } from './icons';
+import { DashboardIcon, LogOutIcon, ShieldIcon, StoreIcon } from './icons';
 import { ThemeToggle } from './theme-toggle';
 
 type NavItem = {
   href: string;
   label: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
+  /** Hidden from non-admins. Hiding is a courtesy, not a check — RequireAdmin on the
+   * page itself is what actually refuses a member who types the URL. */
+  adminOnly?: true;
 };
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
   { href: '/restaurants', label: 'Restaurants', icon: StoreIcon },
+  { href: '/access', label: 'Access', icon: ShieldIcon, adminOnly: true },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -27,16 +33,22 @@ function isActive(pathname: string, href: string) {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { data: user } = useSession();
+  const { role } = useAccess();
   const logout = useLogout();
 
   const username = user?.getUsername() ?? '';
-  const current = NAV_ITEMS.find((item) => isActive(pathname, item.href));
+  // Computed once and threaded into all three navs (title, mobile pills, sidebar) rather
+  // than filtered at each of them, so a fourth consumer can't quietly ship the full list.
+  const visibleItems = NAV_ITEMS.filter((item) => !item.adminOnly || role === 'admin');
+  const current = visibleItems.find((item) => isActive(pathname, item.href));
 
   return (
     <div className="flex min-h-dvh">
       <Sidebar
+        items={visibleItems}
         pathname={pathname}
         username={username}
+        roleLabel={role === 'admin' ? ROLE_LABELS.admin : 'Finance'}
         onLogout={() => logout.mutate()}
         isLoggingOut={logout.isPending}
       />
@@ -78,7 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Mobile nav: the sidebar is desktop-only, so the same two destinations
               ride along under the header as a scrollable pill row. */}
           <nav className="flex gap-2 overflow-x-auto px-5 pb-3 lg:hidden">
-            {NAV_ITEMS.map((item) => {
+            {visibleItems.map((item) => {
               const active = isActive(pathname, item.href);
               return (
                 <Link
@@ -109,13 +121,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function Sidebar({
+  items,
   pathname,
   username,
+  roleLabel,
   onLogout,
   isLoggingOut,
 }: {
+  items: NavItem[];
   pathname: string;
   username: string;
+  roleLabel: string;
   onLogout: () => void;
   isLoggingOut: boolean;
 }) {
@@ -134,7 +150,7 @@ function Sidebar({
       </span>
 
       <nav className="flex flex-col gap-1">
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const active = isActive(pathname, item.href);
           return (
             <Link
@@ -171,7 +187,9 @@ function Sidebar({
           </span>
           <span className="flex min-w-0 flex-col leading-tight">
             <span className="text-body truncate font-bold">{username || 'Signed in'}</span>
-            <span className="text-micro text-muted">Finance</span>
+            {/* The role, where the footer already says who you are — an admin needs to
+                know which hat they're wearing before they touch /access. */}
+            <span className="text-micro text-muted">{roleLabel}</span>
           </span>
           <Tooltip>
             <Button

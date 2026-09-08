@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { User as ParseUser } from 'parse';
 import { getParse } from '@/lib/parse/client';
 import { queryKeys } from '@/lib/query/keys';
+import { canAccessFinance, type AccessFields } from '@/lib/auth/access';
 
 /**
  * The query cache IS the session store — no separate AuthProvider/context needed.
@@ -22,12 +23,44 @@ export function useSession() {
   });
 }
 
+/**
+ * Reads the access fields off the user object Parse hands back from `logIn`. No second
+ * request: this is the caller's own row, so the login response already carries every
+ * field on it.
+ */
+function accessFieldsOf(user: ParseUser): AccessFields {
+  return {
+    staffType: user.get('staffType'),
+    appType: user.get('appType'),
+    financeAccess: user.get('financeAccess'),
+    enabled: user.get('enabled'),
+  };
+}
+
 export function useLogin() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ username, password }: { username: string; password: string }) =>
-      getParse().User.logIn<ParseUser>(username, password),
+    mutationFn: async ({ username, password }: { username: string; password: string }) => {
+      const Parse = getParse();
+      const user = await Parse.User.logIn<ParseUser>(username, password);
+
+      // Authenticate, inspect, then log back out — the same shape switch-manager and
+      // switch-driver use for their own appType check (screens/Login/Login.js). The
+      // credentials were valid, so the alternative is a login that "succeeds" and is
+      // then immediately bounced by RequireAuth into a denial screen, which reads as a
+      // broken app rather than as a closed door. Tearing the session down here also
+      // means a denied account leaves no Parse user behind in localStorage.
+      if (!canAccessFinance(accessFieldsOf(user))) {
+        await Parse.User.logOut().catch(() => {});
+        throw new Parse.Error(
+          Parse.Error.OPERATION_FORBIDDEN, // 119 — rendered by parseErrorMessage(_, 'login')
+          'This account does not have access to Switch Finance.',
+        );
+      }
+
+      return user;
+    },
     onSuccess: (user) => {
       // Written straight into the cache instead of invalidating + refetching — the
       // login response already IS the session, so a second round-trip to re-learn

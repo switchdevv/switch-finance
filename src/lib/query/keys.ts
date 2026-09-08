@@ -1,5 +1,6 @@
 import type { RestaurantFilters } from '@/lib/services/restaurants';
 import type { OrderScope } from '@/lib/services/orders';
+import type { StaffFilters } from '@/lib/services/staff';
 
 /** The slice of a resolved range that identifies it for caching — the instants, not the
  * label, so two equivalent ranges reached by different routes share one cache entry. */
@@ -15,6 +16,18 @@ type RangeKey = { from: string; to: string };
  */
 export const queryKeys = {
   session: ['session'] as const,
+  /** The signed-in account's access fields, re-read from the server (see hooks/use-access.ts).
+   * Keyed by objectId rather than being a singleton so signing in as a second account can't
+   * inherit the first one's answer out of the cache. */
+  access: {
+    current: (objectId: string) => ['access', 'current', objectId] as const,
+  },
+  staff: {
+    all: ['staff'] as const,
+    list: (page: number, pageSize: number, filters: StaffFilters) =>
+      ['staff', 'list', page, pageSize, filters] as const,
+    count: (filters: StaffFilters) => ['staff', 'count', filters] as const,
+  },
   cities: {
     all: ['cities'] as const,
     list: () => ['cities', 'list'] as const,

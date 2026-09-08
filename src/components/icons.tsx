@@ -275,6 +275,15 @@ export function BagIcon(props: IconProps) {
 /** The mark used in the sidebar and on the login card — an "S" cut from a rounded
  * square, drawn in the caller's colour so it works on the brand gradient and on a
  * plain surface alike. */
+export function ShieldIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3 5 6v5.5c0 4.2 2.9 7.6 7 9.5 4.1-1.9 7-5.3 7-9.5V6l-7-3Z" />
+      <path d="m9.25 12 2 2 3.5-3.75" />
+    </Icon>
+  );
+}
+
 export function SwitchMark(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false" {...props}>
