@@ -4,7 +4,8 @@ import { useEffect, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert, Button, FieldError, Form, Input, Label, TextField } from '@heroui/react';
 import { useLogin, useSession } from '@/hooks/use-session';
-import { parseErrorMessage } from '@/lib/parse/errors';
+import { useI18n } from '@/lib/i18n/provider';
+import { parseErrorKey } from '@/lib/parse/errors';
 import { BrandMark } from '@/components/brand-mark';
 
 /** Where to go once signed in. Anything that isn't a single-slash-rooted in-app path is
@@ -19,6 +20,7 @@ function safeNext(raw: string | null): string {
 }
 
 export function LoginForm() {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get('next'));
@@ -67,19 +69,19 @@ export function LoginForm() {
               <h1 className="text-h4 font-bold">
                 Switch <span className="brand-gradient-text">Finance</span>
               </h1>
-              <p className="text-muted text-body mt-1">Sign in with your Switch account.</p>
+              <p className="text-muted text-body mt-1">{t('auth.subtitle')}</p>
             </div>
           </div>
 
           <Form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <TextField name="username" isRequired fullWidth>
-              <Label>Username</Label>
-              <Input autoFocus autoComplete="username" placeholder="your.username" />
+              <Label>{t('auth.username')}</Label>
+              <Input autoFocus autoComplete="username" placeholder={t('auth.usernamePlaceholder')} />
               <FieldError />
             </TextField>
 
             <TextField name="password" isRequired fullWidth>
-              <Label>Password</Label>
+              <Label>{t('auth.password')}</Label>
               <Input type="password" autoComplete="current-password" placeholder="••••••••" />
               <FieldError />
             </TextField>
@@ -87,7 +89,7 @@ export function LoginForm() {
             {login.isError && (
               <Alert status="danger">
                 <Alert.Content>
-                  <Alert.Description>{parseErrorMessage(login.error, 'login')}</Alert.Description>
+                  <Alert.Description>{t(parseErrorKey(login.error, 'login'))}</Alert.Description>
                 </Alert.Content>
               </Alert>
             )}
@@ -100,14 +102,14 @@ export function LoginForm() {
               isDisabled={login.isPending}
               fullWidth
             >
-              {login.isPending ? 'Signing in…' : 'Sign in'}
+              {login.isPending ? t('auth.signingIn') : t('auth.signIn')}
             </Button>
           </Form>
         </div>
       </div>
 
       <p className="text-caption text-muted mt-6 text-center">
-        Internal tool — access is granted by the Switch platform team.
+        {t('auth.footer')}
       </p>
     </div>
   );

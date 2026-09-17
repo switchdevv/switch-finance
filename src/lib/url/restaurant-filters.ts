@@ -18,18 +18,8 @@ export type { RestaurantFilters };
 const STATUSES: RestaurantStatus[] = ['live', 'paused', 'unapproved', 'all'];
 const FLAGS: RestaurantFlag[] = ['isFeatured', 'isDiscount', 'isPromo'];
 
-export const FLAG_LABELS: Record<RestaurantFlag, string> = {
-  isFeatured: 'Featured',
-  isDiscount: 'Discount',
-  isPromo: 'Promo',
-};
-
-export const STATUS_LABELS: Record<RestaurantStatus, string> = {
-  live: 'Live',
-  paused: 'Paused',
-  unapproved: 'Not approved',
-  all: 'All statuses',
-};
+export const FLAG_OPTIONS: readonly RestaurantFlag[] = FLAGS;
+export const STATUS_OPTIONS: readonly RestaurantStatus[] = STATUSES;
 
 type ReadableParams = Pick<URLSearchParams, 'get'>;
 

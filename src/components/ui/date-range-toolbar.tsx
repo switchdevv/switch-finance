@@ -1,6 +1,7 @@
 'use client';
 
 import { RANGE_PRESETS, type DateRange, type RangePreset } from '@/lib/finance/date-range';
+import { useI18n } from '@/lib/i18n/provider';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { CalendarIcon } from '@/components/icons';
 
@@ -22,11 +23,14 @@ export function DateRangeToolbar({
   onPresetChange: (preset: RangePreset) => void;
   onCustomChange: (from: string, to: string) => void;
 }) {
+  const { t, format } = useI18n();
+  const presets = RANGE_PRESETS.map((key) => ({ key, label: t(`range.presets.${key}`) }));
+
   return (
     <div className="flex flex-wrap items-center gap-3">
       <SegmentedControl
-        label="Date range"
-        options={RANGE_PRESETS}
+        label={t('range.label')}
+        options={presets}
         value={range.preset}
         onChange={onPresetChange}
       />
@@ -34,14 +38,14 @@ export function DateRangeToolbar({
       {range.preset === 'custom' ? (
         <div className="flex items-center gap-2">
           <DateInput
-            label="From"
+            label={t('range.from')}
             value={range.from}
             max={range.to}
             onChange={(value) => onCustomChange(value, range.to)}
           />
           <span className="text-muted text-caption">–</span>
           <DateInput
-            label="To"
+            label={t('range.to')}
             value={range.to}
             min={range.from}
             onChange={(value) => onCustomChange(range.from, value)}
@@ -50,7 +54,7 @@ export function DateRangeToolbar({
       ) : (
         <span className="text-caption text-muted flex items-center gap-1.5">
           <CalendarIcon className="size-3.5" />
-          {range.label}
+          {format.range(range)}
         </span>
       )}
     </div>

@@ -35,3 +35,14 @@ export function restaurantInvoiceHref(
   const params = new URLSearchParams({ id: objectId, from: range.from, to: range.to });
   return `${INVOICE_PATH}?${params.toString()}`;
 }
+
+/** The invoice's menu-section filter (lib/finance/categories.ts), comma-separated ids —
+ * absent for the whole restaurant. The invoice page writes it from its own picker. */
+export const CATEGORIES_PARAM = 'categories';
+
+/** The categories an invoice link is narrowed to, deduplicated; empty for the whole
+ * restaurant. */
+export function readCategoryIds(params: ReadableParams): string[] {
+  const raw = params.get(CATEGORIES_PARAM) ?? '';
+  return [...new Set(raw.split(',').map((id) => id.trim()).filter(Boolean))];
+}

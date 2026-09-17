@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { Button } from '@heroui/react';
 import { useLogout } from '@/hooks/use-session';
+import { useI18n } from '@/lib/i18n/provider';
 import { BrandMark } from './brand-mark';
 
 /**
@@ -14,8 +15,8 @@ import { BrandMark } from './brand-mark';
  * same page, and clearing the session by hand is not a thing to ask of them.
  */
 export function NotAuthorized({
-  title = "You don't have access to Switch Finance",
-  description = 'This account can sign in to Switch, but finance is restricted. An admin can grant you access from the Access page.',
+  title,
+  description,
   action,
 }: {
   title?: string;
@@ -23,14 +24,15 @@ export function NotAuthorized({
   /** Rendered before Sign out — a Retry, when the denial is really a failed check. */
   action?: ReactNode;
 }) {
+  const { t } = useI18n();
   const logout = useLogout();
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
       <BrandMark className="size-12" />
       <div className="max-w-prose">
-        <h1 className="text-h5 font-bold">{title}</h1>
-        <p className="text-muted text-body mt-2">{description}</p>
+        <h1 className="text-h5 font-bold">{title ?? t('gate.deniedTitle')}</h1>
+        <p className="text-muted text-body mt-2">{description ?? t('gate.deniedBody')}</p>
       </div>
       <div className="flex items-center gap-2">
         {action}
@@ -40,7 +42,7 @@ export function NotAuthorized({
           onPress={() => logout.mutate()}
           isDisabled={logout.isPending}
         >
-          {logout.isPending ? 'Signing out…' : 'Sign out'}
+          {logout.isPending ? t('gate.signingOut') : t('gate.signOut')}
         </Button>
       </div>
     </div>

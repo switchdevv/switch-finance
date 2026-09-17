@@ -5,7 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@heroui/react';
 import { useSession } from '@/hooks/use-session';
 import { useAccess } from '@/hooks/use-access';
-import { parseErrorMessage } from '@/lib/parse/errors';
+import { useI18n } from '@/lib/i18n/provider';
+import { parseErrorKey } from '@/lib/parse/errors';
 import { FullPageLoader } from './full-page-loader';
 import { NotAuthorized } from './not-authorized';
 
@@ -26,6 +27,7 @@ import { NotAuthorized } from './not-authorized';
  * around it — an invoice URL is a guessable query string, not a secret.
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const { data: user, isPending } = useSession();
   const access = useAccess();
   const router = useRouter();
@@ -55,11 +57,11 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (access.isError) {
     return (
       <NotAuthorized
-        title="Couldn't verify your access"
-        description={parseErrorMessage(access.error, 'fetch')}
+        title={t('gate.checkFailed')}
+        description={t(parseErrorKey(access.error, 'fetch'))}
         action={
           <Button variant="primary" size="sm" onPress={access.refetch}>
-            Try again
+            {t('common.tryAgain')}
           </Button>
         }
       />

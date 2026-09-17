@@ -1,0 +1,53 @@
+name: Deploy to production
+
+# Every merge to main publishes switch-finance.web.app. workflow_dispatch is the
+# manual escape hatch for re-deploying a known-green commit without an empty push.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Two merges in quick succession would otherwise race each other to Hosting and the
+# older build could land last. Queueing (rather than cancelling) keeps main deployed.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      # `next build` type-checks as it goes, so there is no separate tsc step — and a
+      # standalone one would fail anyway, since next-env.d.ts is gitignored and only
+      # exists after a build.
+      #
+      # NEXT_PUBLIC_* are inlined into the bundle at build time and are not secrets:
+      # the same app id ships inside every published RN app binary (see .env.example).
+      # Repo-level Variables override the defaults if this ever needs another backend.
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_PARSE_APP_ID: ${{ vars.NEXT_PUBLIC_PARSE_APP_ID || 'switchApp' }}
+          NEXT_PUBLIC_PARSE_SERVER_URL: ${{ vars.NEXT_PUBLIC_PARSE_SERVER_URL || 'https://api.switchfood.net' }}
+
+      # No `target:` input on purpose: firebase.json already pins "site": "switch-finance",
+      # which is what keeps this deploy off switch-proj's default site. Adding a target
+      # here would require `firebase target:apply` entries in .firebaserc that don't exist.
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SWITCH_PROJ }}
+          projectId: switch-proj
+          channelId: live

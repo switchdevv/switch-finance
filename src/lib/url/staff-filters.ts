@@ -16,11 +16,7 @@ export type { StaffFilters };
  */
 const ACCESS_VALUES: AccessFilter[] = ['all', 'granted', 'denied'];
 
-export const ACCESS_LABELS: Record<AccessFilter, string> = {
-  all: 'All',
-  granted: 'Has access',
-  denied: 'No access',
-};
+export const ACCESS_OPTIONS: readonly AccessFilter[] = ACCESS_VALUES;
 
 type ReadableParams = Pick<URLSearchParams, 'get'>;
 

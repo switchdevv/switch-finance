@@ -5,9 +5,9 @@ export default function DashboardPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Overview"
-        title="Dashboard"
-        description="Welcome to the Switch finance dashboard."
+        eyebrow="dashboard.eyebrow"
+        title="dashboard.title"
+        description="dashboard.description"
       />
       <DashboardOverview />
     </>

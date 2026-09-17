@@ -6,14 +6,16 @@ import { usePathname } from 'next/navigation';
 import { Button, Tooltip } from '@heroui/react';
 import { useSession, useLogout } from '@/hooks/use-session';
 import { useAccess } from '@/hooks/use-access';
-import { ROLE_LABELS } from '@/lib/auth/access';
+import type { MessageKey } from '@/lib/i18n/dictionary';
+import { useI18n } from '@/lib/i18n/provider';
 import { BrandMark } from './brand-mark';
 import { DashboardIcon, LogOutIcon, ShieldIcon, StoreIcon } from './icons';
+import { LanguageToggle } from './language-toggle';
 import { ThemeToggle } from './theme-toggle';
 
 type NavItem = {
   href: string;
-  label: string;
+  label: MessageKey;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   /** Hidden from non-admins. Hiding is a courtesy, not a check — RequireAdmin on the
    * page itself is what actually refuses a member who types the URL. */
@@ -21,9 +23,9 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
-  { href: '/restaurants', label: 'Restaurants', icon: StoreIcon },
-  { href: '/access', label: 'Access', icon: ShieldIcon, adminOnly: true },
+  { href: '/dashboard', label: 'nav.dashboard', icon: DashboardIcon },
+  { href: '/restaurants', label: 'nav.restaurants', icon: StoreIcon },
+  { href: '/access', label: 'nav.access', icon: ShieldIcon, adminOnly: true },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -31,6 +33,7 @@ function isActive(pathname: string, href: string) {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const pathname = usePathname();
   const { data: user } = useSession();
   const { role } = useAccess();
@@ -48,7 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         items={visibleItems}
         pathname={pathname}
         username={username}
-        roleLabel={role === 'admin' ? ROLE_LABELS.admin : 'Finance'}
+        roleLabel={role === 'admin' ? t('roles.admin') : t('nav.finance')}
         onLogout={() => logout.mutate()}
         isLoggingOut={logout.isPending}
       />
@@ -63,11 +66,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <BrandMark className="size-8" />
               </Link>
               <span className="text-h6 text-foreground hidden truncate font-bold lg:block">
-                {current?.label ?? 'Switch Finance'}
+                {current ? t(current.label) : t('app.title')}
               </span>
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
+              <LanguageToggle />
               <ThemeToggle />
               <div className="lg:hidden">
                 <Tooltip>
@@ -75,13 +79,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                     variant="ghost"
                     size="sm"
                     isIconOnly
-                    aria-label="Log out"
+                    aria-label={t('nav.logOut')}
                     onPress={() => logout.mutate()}
                     isDisabled={logout.isPending}
                   >
                     <LogOutIcon className="size-4" />
                   </Button>
-                  <Tooltip.Content>Log out</Tooltip.Content>
+                  <Tooltip.Content>{t('nav.logOut')}</Tooltip.Content>
                 </Tooltip>
               </div>
             </div>
@@ -105,7 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   }
                 >
                   <item.icon className="size-4" />
-                  {item.label}
+                  {t(item.label)}
                 </Link>
               );
             })}
@@ -135,18 +139,22 @@ function Sidebar({
   onLogout: () => void;
   isLoggingOut: boolean;
 }) {
+  const { t } = useI18n();
+
   return (
     <aside className="border-border/70 bg-surface/60 sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r px-4 py-5 backdrop-blur-xl lg:flex">
       <Link href="/dashboard" className="mb-8 flex items-center gap-3 px-2">
         <BrandMark className="size-9" />
         <span className="flex flex-col leading-tight">
-          <span className="text-h6 font-bold">Switch</span>
-          <span className="text-micro text-muted tracking-[0.16em] uppercase">Finance</span>
+          <span className="text-h6 font-bold">{t('app.name')}</span>
+          <span className="text-micro text-muted tracking-[0.16em] uppercase">
+            {t('app.suite')}
+          </span>
         </span>
       </Link>
 
       <span className="text-micro text-muted mb-2 px-3 font-bold tracking-[0.16em] uppercase">
-        Menu
+        {t('nav.menu')}
       </span>
 
       <nav className="flex flex-col gap-1">
@@ -174,7 +182,7 @@ function Sidebar({
                 }
               />
               <item.icon className="size-[18px] shrink-0" />
-              {item.label}
+              {t(item.label)}
             </Link>
           );
         })}
@@ -186,7 +194,7 @@ function Sidebar({
             {username.slice(0, 2) || '—'}
           </span>
           <span className="flex min-w-0 flex-col leading-tight">
-            <span className="text-body truncate font-bold">{username || 'Signed in'}</span>
+            <span className="text-body truncate font-bold">{username || t('nav.signedIn')}</span>
             {/* The role, where the footer already says who you are — an admin needs to
                 know which hat they're wearing before they touch /access. */}
             <span className="text-micro text-muted">{roleLabel}</span>
@@ -197,13 +205,13 @@ function Sidebar({
               size="sm"
               isIconOnly
               className="ms-auto shrink-0"
-              aria-label="Log out"
+              aria-label={t('nav.logOut')}
               onPress={onLogout}
               isDisabled={isLoggingOut}
             >
               <LogOutIcon className="size-4" />
             </Button>
-            <Tooltip.Content>Log out</Tooltip.Content>
+            <Tooltip.Content>{t('nav.logOut')}</Tooltip.Content>
           </Tooltip>
         </div>
       </div>

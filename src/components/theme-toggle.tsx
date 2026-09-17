@@ -2,17 +2,20 @@
 
 import type { ComponentType, SVGProps } from 'react';
 import { useTheme } from 'next-themes';
+import type { MessageKey } from '@/lib/i18n/dictionary';
+import { useI18n } from '@/lib/i18n/provider';
 import { MonitorIcon, MoonIcon, SunIcon } from './icons';
 
 const MODES = [
-  { value: 'light', label: 'Light', icon: SunIcon },
-  { value: 'dark', label: 'Dark', icon: MoonIcon },
-  { value: 'system', label: 'System', icon: MonitorIcon },
-] satisfies { value: string; label: string; icon: ComponentType<SVGProps<SVGSVGElement>> }[];
+  { value: 'light', label: 'theme.light', icon: SunIcon },
+  { value: 'dark', label: 'theme.dark', icon: MoonIcon },
+  { value: 'system', label: 'theme.system', icon: MonitorIcon },
+] satisfies { value: string; label: MessageKey; icon: ComponentType<SVGProps<SVGSVGElement>> }[];
 
 type Mode = (typeof MODES)[number]['value'];
 
 export function ThemeToggle() {
+  const { t } = useI18n();
   const { theme, setTheme } = useTheme();
   // `theme` is undefined both on the server render and on the first client render
   // (next-themes only resolves the persisted value inside its own effect, after
@@ -26,7 +29,7 @@ export function ThemeToggle() {
     // to discover what the third option was.
     <div
       role="radiogroup"
-      aria-label="Colour theme"
+      aria-label={t('theme.label')}
       className="border-border/70 bg-surface-secondary/70 flex items-center gap-0.5 rounded-pill border p-1"
     >
       {MODES.map((mode) => {
@@ -37,8 +40,8 @@ export function ThemeToggle() {
             type="button"
             role="radio"
             aria-checked={active}
-            aria-label={mode.label}
-            title={mode.label}
+            aria-label={t(mode.label)}
+            title={t(mode.label)}
             onClick={() => setTheme(mode.value)}
             className={
               'focus-visible:ring-focus grid size-7 place-items-center rounded-pill transition-colors outline-none focus-visible:ring-2 ' +

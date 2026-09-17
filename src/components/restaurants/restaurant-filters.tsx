@@ -3,17 +3,15 @@
 import { useEffect, useState } from 'react';
 import { Button, ListBox, SearchField, Select, ToggleButton } from '@heroui/react';
 import { useCities } from '@/hooks/use-cities';
+import { useI18n } from '@/lib/i18n/provider';
 import {
-  FLAG_LABELS,
+  FLAG_OPTIONS,
   isDefaultFilters,
-  STATUS_LABELS,
+  STATUS_OPTIONS,
   type RestaurantFilters as Filters,
 } from '@/lib/url/restaurant-filters';
 import type { RestaurantFlag, RestaurantStatus } from '@/lib/services/restaurants';
 import { CloseIcon, SearchIcon } from '@/components/icons';
-
-const STATUS_OPTIONS: RestaurantStatus[] = ['live', 'paused', 'unapproved', 'all'];
-const FLAG_OPTIONS: RestaurantFlag[] = ['isFeatured', 'isDiscount', 'isPromo'];
 
 const ALL_CITIES = '__all__';
 
@@ -24,6 +22,7 @@ export function RestaurantFilters({
   filters: Filters;
   onChange: (filters: Filters) => void;
 }) {
+  const { t } = useI18n();
   const cities = useCities();
 
   // The search box is the one control that can't write straight through to the URL:
@@ -66,7 +65,7 @@ export function RestaurantFilters({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <SearchField
-        aria-label="Search restaurants by name"
+        aria-label={t('restaurants.filters.searchLabel')}
         value={search}
         onChange={setSearch}
         className="w-full sm:w-56"
@@ -75,13 +74,13 @@ export function RestaurantFilters({
           <SearchField.SearchIcon>
             <SearchIcon className="size-4" />
           </SearchField.SearchIcon>
-          <SearchField.Input placeholder="Search by name" />
+          <SearchField.Input placeholder={t('restaurants.filters.searchPlaceholder')} />
           <SearchField.ClearButton />
         </SearchField.Group>
       </SearchField>
 
       <Select
-        aria-label="Status"
+        aria-label={t('restaurants.filters.status')}
         selectedKey={filters.status}
         onSelectionChange={(key) => onChange({ ...filters, status: key as RestaurantStatus })}
         className="w-40"
@@ -93,8 +92,12 @@ export function RestaurantFilters({
         <Select.Popover>
           <ListBox>
             {STATUS_OPTIONS.map((status) => (
-              <ListBox.Item key={status} id={status} textValue={STATUS_LABELS[status]}>
-                {STATUS_LABELS[status]}
+              <ListBox.Item
+                key={status}
+                id={status}
+                textValue={t(`restaurants.status.${status}`)}
+              >
+                {t(`restaurants.status.${status}`)}
               </ListBox.Item>
             ))}
           </ListBox>
@@ -102,7 +105,7 @@ export function RestaurantFilters({
       </Select>
 
       <Select
-        aria-label="City"
+        aria-label={t('restaurants.filters.city')}
         selectedKey={filters.city ?? ALL_CITIES}
         isDisabled={cities.status !== 'success'}
         onSelectionChange={(key) =>
@@ -116,8 +119,8 @@ export function RestaurantFilters({
         </Select.Trigger>
         <Select.Popover>
           <ListBox>
-            <ListBox.Item id={ALL_CITIES} textValue="All cities">
-              All cities
+            <ListBox.Item id={ALL_CITIES} textValue={t('restaurants.filters.allCities')}>
+              {t('restaurants.filters.allCities')}
             </ListBox.Item>
             {/* Rendered as a flat list rather than <>{...}</> around a map: RAC reads the
                 children to build its collection, and a fragment hides the items from it. */}
@@ -135,11 +138,11 @@ export function RestaurantFilters({
           <ToggleButton
             key={flag}
             size="sm"
-            aria-label={FLAG_LABELS[flag]}
+            aria-label={t(`restaurants.flags.${flag}`)}
             isSelected={(filters.flags ?? []).includes(flag)}
             onChange={(isSelected) => toggleFlag(flag, isSelected)}
           >
-            {FLAG_LABELS[flag]}
+            {t(`restaurants.flags.${flag}`)}
           </ToggleButton>
         ))}
       </div>
@@ -149,10 +152,10 @@ export function RestaurantFilters({
           variant="ghost"
           size="sm"
           onPress={() => onChange({ status: 'live' })}
-          aria-label="Clear filters"
+          aria-label={t('common.clearFilters')}
         >
           <CloseIcon className="size-3.5" />
-          Clear
+          {t('common.clear')}
         </Button>
       )}
     </div>

@@ -54,7 +54,7 @@ export function useLogin() {
       if (!canAccessFinance(accessFieldsOf(user))) {
         await Parse.User.logOut().catch(() => {});
         throw new Parse.Error(
-          Parse.Error.OPERATION_FORBIDDEN, // 119 — rendered by parseErrorMessage(_, 'login')
+          Parse.Error.OPERATION_FORBIDDEN, // 119 — rendered by parseErrorKey(_, 'login')
           'This account does not have access to Switch Finance.',
         );
       }

@@ -1,20 +1,29 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Alert, Button } from '@heroui/react';
+import { useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Alert, Button, ListBox, Select } from '@heroui/react';
+import { useOrderCategories } from '@/hooks/use-order-categories';
 import { useRestaurant } from '@/hooks/use-restaurants';
 import { useOrdersInRange } from '@/hooks/use-orders';
-import { resolveRange } from '@/lib/finance/date-range';
+import {
+  categoryCode,
+  categoryLabel,
+  sliceOrders,
+  type OrderCategory,
+} from '@/lib/finance/categories';
+import { resolveRange, type DateRange } from '@/lib/finance/date-range';
 import { computeTotals, type OrderTotals } from '@/lib/finance/totals';
-import { formatDate, formatMoney, formatNumber, formatOrNone, formatRate, shortId } from '@/lib/format';
-import { parseErrorMessage } from '@/lib/parse/errors';
+import { formatOrNone, shortId } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/provider';
+import { parseErrorKey } from '@/lib/parse/errors';
 import type { CurrencyCode } from '@/types/city';
 import type { OrderWithUser } from '@/types/order';
 import type { RestaurantWithRelations } from '@/types/restaurant';
-import { readRestaurantId } from '@/lib/url/routes';
+import { CATEGORIES_PARAM, readCategoryIds, readRestaurantId } from '@/lib/url/routes';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { BrandMark } from '@/components/brand-mark';
+import { LanguageToggle } from '@/components/language-toggle';
 import { PrinterIcon } from '@/components/icons';
 
 /**
@@ -28,12 +37,15 @@ import { PrinterIcon } from '@/components/icons';
  */
 type Mode = 'commission' | 'statement';
 
-const MODES = [
-  { key: 'commission' as const, label: 'Commission invoice' },
-  { key: 'statement' as const, label: 'Sales statement' },
-];
+const MODES: readonly Mode[] = ['commission', 'statement'];
+
+/** The part of the restaurant a document covers, when it isn't all of it. */
+type CategoryScope = { label: string; code: string; count: number };
 
 export function InvoiceDocument() {
+  const { t, format } = useI18n();
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const objectId = readRestaurantId(searchParams);
   const from = searchParams.get('from');
@@ -42,39 +54,100 @@ export function InvoiceDocument() {
     searchParams.get('mode') === 'statement' ? 'statement' : 'commission',
   );
 
+  // In the URL, unlike the mode: which part of the restaurant is billed changes what the
+  // document *is*, so a link to it has to carry that.
+  const categoryIds = useMemo(() => readCategoryIds(searchParams), [searchParams]);
+  const isNarrowed = categoryIds.length > 0;
+
   const range = useMemo(() => resolveRange('custom', from, to), [from, to]);
 
   const restaurantQuery = useRestaurant(objectId);
   const ordersQuery = useOrdersInRange(objectId, range);
+  // Always loaded, not only for a narrowed link: the picker needs it to offer anything.
+  const { query: catalogueQuery, categories } = useOrderCategories(
+    objectId,
+    ordersQuery.data?.orders,
+    { enabled: true },
+  );
 
   const restaurant = restaurantQuery.data;
-  const orders = useMemo(() => ordersQuery.data?.orders ?? [], [ordersQuery.data]);
+  const catalogue = catalogueQuery.data;
+  const orders = useMemo(() => {
+    const all = ordersQuery.data?.orders ?? [];
+    if (!isNarrowed) return all;
+    return catalogue ? sliceOrders(all, catalogue.dishes, categoryIds) : [];
+  }, [ordersQuery.data, isNarrowed, catalogue, categoryIds]);
   const totals = useMemo(() => computeTotals(orders, restaurant?.fee), [orders, restaurant?.fee]);
 
+  const unsoldCategoryCount = categoryIds.filter(
+    (id) => !categories.some((category) => category.id === id),
+  ).length;
+
+  const scope = useMemo<CategoryScope | undefined>(
+    () =>
+      isNarrowed && catalogue
+        ? {
+            label: categoryLabel(categoryIds, catalogue.menuNames, t),
+            code: categoryCode(categoryIds),
+            count: categoryIds.length,
+          }
+        : undefined,
+    [isNarrowed, catalogue, categoryIds, t],
+  );
+
+  // The tab's title is what the browser offers as the filename when this is saved as a
+  // PDF, so it is translated like the document it names — and restored on the way out,
+  // since the whole app is one document in a static export.
+  const documentTitle =
+    restaurantQuery.data && `${t(`invoice.modes.${mode}`)} — ${formatOrNone(restaurantQuery.data.name)} — ${format.range(range)}`;
+  useEffect(() => {
+    if (!documentTitle) return;
+    const previous = document.title;
+    document.title = documentTitle;
+    return () => {
+      document.title = previous;
+    };
+  }, [documentTitle]);
+
+  const setCategoryIds = (next: string[]) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next.length > 0) params.set(CATEGORIES_PARAM, next.join(','));
+    else params.delete(CATEGORIES_PARAM);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
   if (!objectId) {
-    return <p className="text-muted p-10 text-center">This invoice link is incomplete.</p>;
+    return <p className="text-muted p-10 text-center">{t('invoice.incomplete')}</p>;
   }
 
-  if (restaurantQuery.status === 'error' || ordersQuery.status === 'error') {
-    const error = restaurantQuery.error ?? ordersQuery.error;
+  // The lookup only blocks the document when the document depends on it — a
+  // whole-restaurant invoice still prints if the menu sections can't be read.
+  const catalogueBlocks = isNarrowed && catalogueQuery.status === 'error';
+
+  if (restaurantQuery.status === 'error' || ordersQuery.status === 'error' || catalogueBlocks) {
+    const error = restaurantQuery.error ?? ordersQuery.error ?? catalogueQuery.error;
     return (
       <div className="mx-auto max-w-2xl p-10">
         <Alert status="danger">
           <Alert.Content>
-            <Alert.Title>Couldn&apos;t build this invoice</Alert.Title>
-            <Alert.Description>{parseErrorMessage(error, 'fetch')}</Alert.Description>
+            <Alert.Title>{t('invoice.buildError')}</Alert.Title>
+            <Alert.Description>{t(parseErrorKey(error, 'fetch'))}</Alert.Description>
           </Alert.Content>
         </Alert>
       </div>
     );
   }
 
-  if (restaurantQuery.status === 'pending' || ordersQuery.status === 'pending') {
-    return <p className="text-muted p-10 text-center">Preparing the invoice…</p>;
+  if (
+    restaurantQuery.status === 'pending' ||
+    ordersQuery.status === 'pending' ||
+    (isNarrowed && catalogueQuery.status === 'pending')
+  ) {
+    return <p className="text-muted p-10 text-center">{t('invoice.preparing')}</p>;
   }
 
   if (!restaurant) {
-    return <p className="text-muted p-10 text-center">That restaurant no longer exists.</p>;
+    return <p className="text-muted p-10 text-center">{t('invoice.gone')}</p>;
   }
 
   const currency = restaurant.city?.currency;
@@ -84,21 +157,51 @@ export function InvoiceDocument() {
       {/* The controls are the screen's, not the document's — `print:hidden` is what keeps
           them off the paper without a second copy of the layout. */}
       <div className="mx-auto mb-6 flex max-w-[210mm] flex-wrap items-center justify-between gap-3 px-4 print:hidden">
-        <SegmentedControl label="Invoice type" options={MODES} value={mode} onChange={setMode} />
-        <Button variant="primary" size="sm" onPress={() => window.print()}>
-          <PrinterIcon className="size-4" />
-          Print / Save as PDF
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <SegmentedControl
+            label={t('invoice.modeLabel')}
+            options={MODES.map((key) => ({ key, label: t(`invoice.modes.${key}`) }))}
+            value={mode}
+            onChange={setMode}
+          />
+          <CategoryPicker
+            categories={categories}
+            value={categoryIds}
+            isDisabled={catalogueQuery.status !== 'success' || categories.length === 0}
+            onChange={setCategoryIds}
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          {/* This route has none of the app chrome, and the document's language is the
+              one it prints in — so the switcher has to be here, next to Print. */}
+          <LanguageToggle />
+          <Button variant="primary" size="sm" onPress={() => window.print()}>
+            <PrinterIcon className="size-4" />
+            {t('invoice.print')}
+          </Button>
+        </div>
       </div>
+
+      {unsoldCategoryCount > 0 && (
+        <div className="mx-auto mb-6 max-w-[210mm] px-4 print:hidden">
+          <Alert status="warning">
+            <Alert.Content>
+              <Alert.Title>{t('invoice.unsoldTitle')}</Alert.Title>
+              <Alert.Description>{t('invoice.unsoldBody')}</Alert.Description>
+            </Alert.Content>
+          </Alert>
+        </div>
+      )}
 
       {ordersQuery.data?.truncated && (
         <div className="mx-auto mb-6 max-w-[210mm] px-4 print:hidden">
           <Alert status="warning">
             <Alert.Content>
-              <Alert.Title>This period is too large to invoice exactly</Alert.Title>
+              <Alert.Title>{t('invoice.truncatedTitle')}</Alert.Title>
               <Alert.Description>
-                Only the first {formatNumber(orders.length)} orders were read. Narrow the dates
-                before sending this to anyone.
+                {t('invoice.truncatedBody', {
+                  count: format.number(ordersQuery.data.orders.length),
+                })}
               </Alert.Description>
             </Alert.Content>
           </Alert>
@@ -112,8 +215,60 @@ export function InvoiceDocument() {
         totals={totals}
         currency={currency}
         mode={mode}
+        scope={scope}
       />
     </div>
+  );
+}
+
+/**
+ * Narrows the document to some of the restaurant's menu sections — e.g. a crêpe station
+ * billed apart from the rest. Offers only the sections that sold in the period; nothing
+ * picked is the whole restaurant.
+ */
+function CategoryPicker({
+  categories,
+  value,
+  isDisabled,
+  onChange,
+}: {
+  categories: OrderCategory[];
+  value: string[];
+  isDisabled: boolean;
+  onChange: (next: string[]) => void;
+}) {
+  const { t, format } = useI18n();
+
+  return (
+    <Select
+      aria-label={t('invoice.categoriesLabel')}
+      selectionMode="multiple"
+      placeholder={t('invoice.wholeRestaurant')}
+      value={value}
+      onChange={(keys) => onChange(keys.map(String))}
+      isDisabled={isDisabled}
+      className="w-64"
+    >
+      <Select.Trigger>
+        <Select.Value />
+        <Select.Indicator />
+      </Select.Trigger>
+      <Select.Popover>
+        <ListBox>
+          {categories.map((category) => (
+            <ListBox.Item key={category.id} id={category.id} textValue={category.name}>
+              <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                <span className="truncate">{category.name}</span>
+                <span className="text-caption text-muted tabular">
+                  {format.number(category.orderCount)}
+                </span>
+              </span>
+              <ListBox.ItemIndicator />
+            </ListBox.Item>
+          ))}
+        </ListBox>
+      </Select.Popover>
+    </Select>
   );
 }
 
@@ -130,21 +285,24 @@ export function InvoiceSheet({
   totals,
   currency,
   mode,
+  scope,
 }: {
   restaurant: RestaurantWithRelations;
-  range: { from: string; to: string; label: string };
+  range: DateRange;
+  /** Already narrowed to `scope`'s categories, as are `totals`. */
   orders: OrderWithUser[];
   totals: OrderTotals;
   currency: CurrencyCode | undefined;
   mode: Mode;
+  scope?: CategoryScope;
 }) {
   return (
     <article className="invoice-sheet shadow-card mx-auto max-w-[210mm] bg-white px-[14mm] py-[14mm] text-[#111827] print:max-w-none print:shadow-none">
-      <Header restaurant={restaurant} range={range} mode={mode} />
-      <BilledTo restaurant={restaurant} mode={mode} />
+      <Header restaurant={restaurant} range={range} mode={mode} scope={scope} />
+      <BilledTo restaurant={restaurant} mode={mode} scope={scope} />
       <Summary totals={totals} mode={mode} currency={currency} />
       <Lines orders={orders} currency={currency} />
-      <Footnote rate={totals.rate} />
+      <Footnote rate={totals.rate} scope={scope} />
     </article>
   );
 }
@@ -153,50 +311,75 @@ function Header({
   restaurant,
   range,
   mode,
+  scope,
 }: {
   restaurant: RestaurantWithRelations;
-  range: { from: string; to: string; label: string };
+  range: DateRange;
   mode: Mode;
+  scope?: CategoryScope;
 }) {
+  const { t, format } = useI18n();
+
   return (
     <header className="mb-8 flex items-start justify-between gap-6 border-b border-[#e5e7eb] pb-6">
       <div className="flex items-center gap-3">
         <BrandMark className="size-10" />
         <div>
-          <p className="text-h6 font-bold">Switch</p>
-          <p className="text-caption text-[#6b7280]">Food delivery platform</p>
+          <p className="text-h6 font-bold">{t('app.name')}</p>
+          <p className="text-caption text-[#6b7280]">{t('invoice.tagline')}</p>
         </div>
       </div>
       <div className="text-end">
-        <p className="text-h5 font-bold">
-          {mode === 'commission' ? 'Commission invoice' : 'Sales statement'}
-        </p>
+        <p className="text-h5 font-bold">{t(`invoice.modes.${mode}`)}</p>
         {/* Deterministic rather than a sequence number: this document can be regenerated
             from a URL at any time, and two runs of the same period must not disagree
-            about what they are. */}
+            about what they are. A category invoice adds a code for its selection, so it
+            never shares a number with the whole restaurant's for the same period. */}
         <p className="text-caption tabular text-[#6b7280]">
-          No. SW-{shortId(restaurant.objectId)}-{range.from.replace(/-/g, '')}
+          {t('invoice.number', {
+            number: `SW-${shortId(restaurant.objectId)}-${range.from.replace(/-/g, '')}${
+              scope ? `-${scope.code}` : ''
+            }`,
+          })}
         </p>
         <p className="text-caption tabular mt-2">
-          <span className="text-[#6b7280]">Period: </span>
-          {range.label}
+          <span className="text-[#6b7280]">{t('invoice.period')} </span>
+          {format.range(range)}
         </p>
         <p className="text-caption tabular">
-          <span className="text-[#6b7280]">Issued: </span>
-          {formatDate(new Date().toISOString())}
+          <span className="text-[#6b7280]">{t('invoice.issued')} </span>
+          {format.date(new Date())}
         </p>
       </div>
     </header>
   );
 }
 
-function BilledTo({ restaurant, mode }: { restaurant: RestaurantWithRelations; mode: Mode }) {
+function BilledTo({
+  restaurant,
+  mode,
+  scope,
+}: {
+  restaurant: RestaurantWithRelations;
+  mode: Mode;
+  scope?: CategoryScope;
+}) {
+  const { t, tCount } = useI18n();
+
   return (
     <section className="mb-8">
       <p className="text-micro font-bold tracking-[0.12em] text-[#6b7280] uppercase">
-        {mode === 'commission' ? 'Billed to' : 'Statement for'}
+        {mode === 'commission' ? t('invoice.billedTo') : t('invoice.statementFor')}
       </p>
       <p className="text-h6 mt-1.5 font-bold">{formatOrNone(restaurant.name)}</p>
+      {scope && (
+        <p className="text-caption mt-0.5 font-bold">
+          <span className="font-normal text-[#6b7280]">
+            {tCount('invoice.category', scope.count)}{' '}
+          </span>
+          {scope.label}
+        </p>
+      )}
       <p className="text-caption text-[#374151]">
         {formatOrNone(restaurant.address)}
         {restaurant.city?.name ? ` · ${restaurant.city.name}` : ''}
@@ -217,22 +400,26 @@ function Summary({
   mode: Mode;
   currency: CurrencyCode | undefined;
 }) {
-  const rows: { label: string; value: string; muted?: boolean }[] =
+  const { t, format } = useI18n();
+
+  const shared = [
+    { label: t('invoice.summary.orders'), value: format.number(totals.ordersCount) },
+    { label: t('invoice.summary.items'), value: format.money(totals.itemsTotal, currency) },
+    { label: t('invoice.summary.discounts'), value: `−${format.money(totals.discount, currency)}` },
+  ];
+
+  const rows: { label: string; value: string }[] =
     mode === 'commission'
       ? [
-          { label: 'Billable orders', value: formatNumber(totals.ordersCount) },
-          { label: 'Items total', value: formatMoney(totals.itemsTotal, currency) },
-          { label: 'Discounts', value: `−${formatMoney(totals.discount, currency)}` },
-          { label: 'Commission base', value: formatMoney(totals.base, currency) },
-          { label: `Commission rate`, value: formatRate(totals.rate) },
+          ...shared,
+          { label: t('invoice.summary.base'), value: format.money(totals.base, currency) },
+          { label: t('invoice.summary.rate'), value: format.rate(totals.rate) },
         ]
       : [
-          { label: 'Billable orders', value: formatNumber(totals.ordersCount) },
-          { label: 'Items total', value: formatMoney(totals.itemsTotal, currency) },
-          { label: 'Discounts', value: `−${formatMoney(totals.discount, currency)}` },
+          ...shared,
           {
-            label: 'Average order',
-            value: formatMoney(Math.round(totals.averageOrder), currency),
+            label: t('invoice.summary.average'),
+            value: format.money(Math.round(totals.averageOrder), currency),
           },
         ];
 
@@ -248,10 +435,12 @@ function Summary({
           ))}
           <tr className="border-t-2 border-[#111827]">
             <td className="py-3 font-bold">
-              {mode === 'commission' ? 'Commission due to Switch' : 'Gross sales for the period'}
+              {mode === 'commission'
+                ? t('invoice.summary.commissionDue')
+                : t('invoice.summary.grossSales')}
             </td>
             <td className="tabular py-3 text-end text-[16px] font-bold">
-              {formatMoney(mode === 'commission' ? totals.commission : totals.base, currency)}
+              {format.money(mode === 'commission' ? totals.commission : totals.base, currency)}
             </td>
           </tr>
         </tbody>
@@ -262,8 +451,8 @@ function Summary({
           that the invoice above exists to bill. */}
       {mode === 'statement' && (
         <p className="text-caption mt-3 text-[#374151]">
-          Commission owed to Switch on this period at {formatRate(totals.rate)}:{' '}
-          <strong className="tabular">{formatMoney(totals.commission, currency)}</strong>
+          {t('invoice.statementCommission', { rate: format.rate(totals.rate) })}{' '}
+          <strong className="tabular">{format.money(totals.commission, currency)}</strong>
         </p>
       )}
 
@@ -271,8 +460,10 @@ function Summary({
           pay them on top of the food, they belong to the driver and the platform, and no
           commission is charged on either. */}
       <p className="text-caption mt-3 text-[#6b7280]">
-        Charged to customers on top of the food and excluded from commission: delivery{' '}
-        {formatMoney(totals.delivery, currency)}, service {formatMoney(totals.service, currency)}.
+        {t('invoice.fees', {
+          delivery: format.money(totals.delivery, currency),
+          service: format.money(totals.service, currency),
+        })}
       </p>
     </section>
   );
@@ -285,22 +476,24 @@ function Lines({
   orders: OrderWithUser[];
   currency: CurrencyCode | undefined;
 }) {
+  const { t, format } = useI18n();
+
   return (
     <section className="mb-8">
       <p className="text-micro mb-2 font-bold tracking-[0.12em] text-[#6b7280] uppercase">
-        Orders in this period
+        {t('invoice.linesTitle')}
       </p>
       <table className="w-full text-[12px]">
         {/* thead, not a styled first row: the print CSS turns this into a repeating
             header so page 2 onward isn't a wall of unlabelled numbers. */}
         <thead>
           <tr className="bg-[#f3f4f6] text-start">
-            <th className="px-2 py-2 text-start font-bold">Order</th>
-            <th className="px-2 py-2 text-start font-bold">Date</th>
-            <th className="px-2 py-2 text-start font-bold">Type</th>
-            <th className="px-2 py-2 text-end font-bold">Items</th>
-            <th className="px-2 py-2 text-end font-bold">Discount</th>
-            <th className="px-2 py-2 text-end font-bold">Net</th>
+            <th className="px-2 py-2 text-start font-bold">{t('invoice.lines.order')}</th>
+            <th className="px-2 py-2 text-start font-bold">{t('invoice.lines.date')}</th>
+            <th className="px-2 py-2 text-start font-bold">{t('invoice.lines.type')}</th>
+            <th className="px-2 py-2 text-end font-bold">{t('invoice.lines.items')}</th>
+            <th className="px-2 py-2 text-end font-bold">{t('invoice.lines.discount')}</th>
+            <th className="px-2 py-2 text-end font-bold">{t('invoice.lines.net')}</th>
           </tr>
         </thead>
         <tbody>
@@ -310,16 +503,16 @@ function Lines({
             return (
               <tr key={order.objectId} className="border-b border-[#f3f4f6]">
                 <td className="tabular px-2 py-1.5">#{shortId(order.objectId)}</td>
-                <td className="tabular px-2 py-1.5">{formatDate(order.createdAt)}</td>
+                <td className="tabular px-2 py-1.5">{format.date(order.createdAt)}</td>
                 <td className="px-2 py-1.5">
-                  {order.deliveryType === 'pickup' ? 'Pickup' : 'Delivery'}
+                  {order.deliveryType === 'pickup' ? t('common.pickup') : t('common.delivery')}
                 </td>
-                <td className="tabular px-2 py-1.5 text-end">{formatMoney(items, currency)}</td>
+                <td className="tabular px-2 py-1.5 text-end">{format.money(items, currency)}</td>
                 <td className="tabular px-2 py-1.5 text-end">
-                  {discount ? `−${formatMoney(discount, currency)}` : '—'}
+                  {discount ? `−${format.money(discount, currency)}` : '—'}
                 </td>
                 <td className="tabular px-2 py-1.5 text-end font-bold">
-                  {formatMoney(items - discount, currency)}
+                  {format.money(items - discount, currency)}
                 </td>
               </tr>
             );
@@ -330,20 +523,16 @@ function Lines({
   );
 }
 
-function Footnote({ rate }: { rate: number }) {
+function Footnote({ rate, scope }: { rate: number; scope?: CategoryScope }) {
+  const { t, format } = useI18n();
+
   return (
     <footer className="border-t border-[#e5e7eb] pt-4 text-[11px] leading-relaxed text-[#6b7280]">
-      <p>
-        Figures cover orders that were not canceled and reached at least the &ldquo;on the
-        way / ready&rdquo; stage, matching what the restaurant sees in its own Switch app.
-      </p>
-      <p className="mt-1">
-        Orders are settled with the restaurant as they are taken, so the only balance shown here
-        is the commission owed to Switch. It is calculated at the restaurant&apos;s current rate of{' '}
-        {formatRate(rate)}, applied to items total less discounts. Orders do not store the rate
-        that was in force when they were placed, so a later change to the rate will change the
-        figures on a reprint of this period.
-      </p>
+      <p>{t('invoice.footnote.billable')}</p>
+      <p className="mt-1">{t('invoice.footnote.settlement', { rate: format.rate(rate) })}</p>
+      {scope && (
+        <p className="mt-1">{t('invoice.footnote.scope', { categories: scope.label })}</p>
+      )}
     </footer>
   );
 }

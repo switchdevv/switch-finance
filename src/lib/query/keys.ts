@@ -51,10 +51,12 @@ export const queryKeys = {
   },
   foods: {
     all: ['foods'] as const,
-    /** Dish names for the Products column. Keyed by the range rather than by the id list
-     * it resolves to: the ids are derived from that range's orders, so the range is the
-     * stable name for the same lookup. */
-    names: (restaurantId: string, range: RangeKey) =>
-      ['foods', 'names', restaurantId, range] as const,
+    /** The dishes a range's orders reference and the menu sections they sit in — the
+     * Products column and the category split. Keyed by the sorted dish ids rather than by
+     * the range: an order placed after the lookup can bring a dish it hasn't seen, and a
+     * range key would keep billing that dish as uncategorised until the cache went
+     * stale. */
+    catalogue: (restaurantId: string, dishIds: readonly string[]) =>
+      ['foods', 'catalogue', restaurantId, dishIds] as const,
   },
 } as const;

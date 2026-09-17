@@ -105,8 +105,7 @@ export function canAccessFinance(user: AccessFields | null | undefined): boolean
   return financeRole(user) !== null;
 }
 
-export const ROLE_LABELS: Record<'admin' | 'member' | 'none', string> = {
-  admin: 'Admin',
-  member: 'Has access',
-  none: 'No access',
-};
+/** The dictionary key naming each role. */
+export function roleKey(role: FinanceRole): 'roles.admin' | 'roles.member' | 'roles.none' {
+  return role === 'admin' ? 'roles.admin' : role === 'member' ? 'roles.member' : 'roles.none';
+}

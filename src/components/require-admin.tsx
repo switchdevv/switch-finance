@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useAccess } from '@/hooks/use-access';
+import { useI18n } from '@/lib/i18n/provider';
 import { ShieldIcon } from './icons';
 
 /**
@@ -18,6 +19,7 @@ import { ShieldIcon } from './icons';
  * Sign out button would be the second one on screen.
  */
 export function RequireAdmin({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const access = useAccess();
 
   // Both queries behind this are already warm from RequireAuth, so in practice this
@@ -32,9 +34,9 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
         <span className="bg-surface-secondary text-muted mb-2 grid size-12 place-items-center rounded-2xl">
           <ShieldIcon className="size-6" />
         </span>
-        <p className="text-h6 font-bold">Admins only</p>
+        <p className="text-h6 font-bold">{t('gate.adminsOnlyTitle')}</p>
         <p className="text-muted text-body max-w-prose">
-          Managing who can use Switch Finance is restricted to admin accounts.
+          {t('gate.adminsOnlyBody')}
         </p>
       </section>
     );

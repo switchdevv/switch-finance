@@ -6,9 +6,9 @@ export default function RestaurantsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Directory"
-        title="Restaurants"
-        description="Every restaurant on the Switch platform, newest first."
+        eyebrow="restaurants.eyebrow"
+        title="restaurants.title"
+        description="restaurants.description"
       />
       {/* RestaurantsTable reads useSearchParams() (the current page number), which
           Next requires to sit inside a Suspense boundary — omitting this passes in

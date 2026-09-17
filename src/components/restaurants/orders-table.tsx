@@ -5,8 +5,9 @@ import { Alert, Button, Skeleton, Table } from '@heroui/react';
 import { ORDER_PAGE_SIZE, useOrders, useOrdersCount } from '@/hooks/use-orders';
 import type { OrderScope } from '@/lib/services/orders';
 import type { DateRange } from '@/lib/finance/date-range';
-import { formatDate, formatMoney, formatOrNone, formatTime, shortId } from '@/lib/format';
-import { parseErrorMessage } from '@/lib/parse/errors';
+import { formatOrNone, shortId } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/provider';
+import { parseErrorKey } from '@/lib/parse/errors';
 import type { CurrencyCode } from '@/types/city';
 import type { OrderWithUser } from '@/types/order';
 import { OrderStatusChip } from '@/components/ui/order-status-chip';
@@ -14,14 +15,14 @@ import { PaginationBar } from '@/components/ui/pagination-bar';
 import { BagIcon, BikeIcon, ReceiptIcon } from '@/components/icons';
 
 const COLUMNS = [
-  { key: 'id', label: 'Order', className: 'w-[7rem] text-start' },
-  { key: 'placed', label: 'Placed', className: 'w-[9rem] text-start' },
-  { key: 'customer', label: 'Customer', className: 'min-w-[10rem] text-start' },
-  { key: 'type', label: 'Type', className: 'w-[7rem] text-start' },
-  { key: 'status', label: 'Status', className: 'w-[9.5rem] text-start' },
-  { key: 'items', label: 'Items', className: 'w-[8rem] text-end' },
-  { key: 'discount', label: 'Discount', className: 'w-[8rem] text-end' },
-  { key: 'total', label: 'Total', className: 'w-[9rem] text-end' },
+  { key: 'id', className: 'w-[7rem] text-start' },
+  { key: 'placed', className: 'w-[9rem] text-start' },
+  { key: 'customer', className: 'min-w-[10rem] text-start' },
+  { key: 'type', className: 'w-[7rem] text-start' },
+  { key: 'status', className: 'w-[9.5rem] text-start' },
+  { key: 'items', className: 'w-[8rem] text-end' },
+  { key: 'discount', className: 'w-[8rem] text-end' },
+  { key: 'total', className: 'w-[9rem] text-end' },
 ] as const;
 
 export function OrdersTable({
@@ -39,6 +40,7 @@ export function OrdersTable({
   page: number;
   onPageChange: (page: number) => void;
 }) {
+  const { t, format } = useI18n();
   const query = { restaurantId, range, scope };
   const rowsQuery = useOrders(query, page);
   const countQuery = useOrdersCount(query);
@@ -60,11 +62,11 @@ export function OrdersTable({
     return (
       <Alert status="danger">
         <Alert.Content>
-          <Alert.Title>Couldn&apos;t load orders</Alert.Title>
-          <Alert.Description>{parseErrorMessage(rowsQuery.error, 'fetch')}</Alert.Description>
+          <Alert.Title>{t('orders.loadError')}</Alert.Title>
+          <Alert.Description>{t(parseErrorKey(rowsQuery.error, 'fetch'))}</Alert.Description>
         </Alert.Content>
         <Button variant="secondary" size="sm" onPress={() => rowsQuery.refetch()}>
-          Retry
+          {t('common.retry')}
         </Button>
       </Alert>
     );
@@ -80,7 +82,7 @@ export function OrdersTable({
         <Table variant="secondary" className="px-3 pb-1">
           <Table.ScrollContainer>
             <Table.Content
-              aria-label="Orders"
+              aria-label={t('orders.tableLabel')}
               className={
                 'min-w-[62rem] ' +
                 (rowsQuery.isPlaceholderData ? 'opacity-50 transition-opacity' : 'transition-opacity')
@@ -93,7 +95,7 @@ export function OrdersTable({
                     isRowHeader={column.key === 'id'}
                     className={`text-micro tracking-[0.12em] uppercase ${column.className}`}
                   >
-                    {column.label}
+                    {t(`orders.columns.${column.key}`)}
                   </Table.Column>
                 ))}
               </Table.Header>
@@ -109,9 +111,9 @@ export function OrdersTable({
                       </span>
                     </Table.Cell>
                     <Table.Cell className="whitespace-nowrap">
-                      <span className="text-body tabular block">{formatDate(order.createdAt)}</span>
+                      <span className="text-body tabular block">{format.date(order.createdAt)}</span>
                       <span className="text-caption text-muted tabular block">
-                        {formatTime(order.createdAt)}
+                        {format.time(order.createdAt)}
                       </span>
                     </Table.Cell>
                     <Table.Cell>
@@ -131,19 +133,19 @@ export function OrdersTable({
                     </Table.Cell>
                     <Table.Cell className="text-end whitespace-nowrap">
                       <span className="text-body tabular">
-                        {formatMoney(order.options?.itemsTotal, currency)}
+                        {format.money(order.options?.itemsTotal, currency)}
                       </span>
                     </Table.Cell>
                     <Table.Cell className="text-end whitespace-nowrap">
                       <span className="text-body tabular text-[var(--danger)]">
                         {order.options?.discount
-                          ? `−${formatMoney(order.options.discount, currency)}`
+                          ? `−${format.money(order.options.discount, currency)}`
                           : '—'}
                       </span>
                     </Table.Cell>
                     <Table.Cell className="text-end whitespace-nowrap">
                       <span className="text-body tabular font-bold">
-                        {formatMoney(
+                        {format.money(
                           (order.options?.itemsTotal ?? 0) - (order.options?.discount ?? 0),
                           currency,
                         )}
@@ -169,28 +171,29 @@ export function OrdersTable({
 }
 
 function TypeCell({ deliveryType }: { deliveryType: string | undefined }) {
+  const { t } = useI18n();
   const isPickup = deliveryType === 'pickup';
   const Icon = isPickup ? BagIcon : BikeIcon;
 
   return (
     <span className="text-caption text-muted flex items-center gap-1.5">
       <Icon className="size-4" />
-      {isPickup ? 'Pickup' : 'Delivery'}
+      {isPickup ? t('common.pickup') : t('common.delivery')}
     </span>
   );
 }
 
 function EmptyRows({ scope }: { scope: OrderScope }) {
+  const { t } = useI18n();
+
   return (
     <div className="flex flex-col items-center gap-2 px-6 py-16 text-center">
       <span className="bg-surface-secondary text-muted mb-2 grid size-12 place-items-center rounded-2xl">
         <ReceiptIcon className="size-6" />
       </span>
-      <p className="text-h6 font-bold">No orders in this period</p>
+      <p className="text-h6 font-bold">{t('orders.emptyTitle')}</p>
       <p className="text-muted text-body">
-        {scope === 'billable'
-          ? 'Nothing billable was placed in the selected dates. Switch to All orders to include canceled and in-progress ones.'
-          : 'Nothing was placed in the selected dates.'}
+        {scope === 'billable' ? t('orders.emptyBillable') : t('orders.emptyAll')}
       </p>
     </div>
   );

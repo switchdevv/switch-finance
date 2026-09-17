@@ -1,6 +1,8 @@
 import type { DateRange } from '@/lib/finance/date-range';
 import type { OrderTotals } from '@/lib/finance/totals';
-import { formatMoney } from '@/lib/format';
+import type { Formatters } from '@/lib/format';
+import type { Translate, TranslateCount } from '@/lib/i18n/dictionary';
+import type { DishCatalogue } from '@/lib/services/foods';
 import type { CurrencyCode } from '@/types/city';
 import type { OrderWithUser } from '@/types/order';
 import {
@@ -26,6 +28,12 @@ const BAND = 'FFF4F7F7';
 const TITLE_SPAN = 6;
 
 export type ExportArgs = {
+  /** The language the sheet is written in — the dashboard's own, at the moment the
+   * button was pressed. Everything the file says comes from here; the figures stay raw
+   * numbers so the recipient's Excel formats them with their own separators. */
+  t: Translate;
+  tCount: TranslateCount;
+  format: Formatters;
   restaurantName: string;
   range: DateRange;
   orders: OrderWithUser[];
@@ -37,8 +45,12 @@ export type ExportArgs = {
   /** The columns picked in the export modal. Their order on the sheet comes from
    * EXPORT_FIELDS, not from this array. */
   fields: readonly ExportFieldKey[];
-  /** Dish names for the Products column, empty when it wasn't picked. */
-  productNames: Map<string, string>;
+  /** Dish names for the Products column. */
+  dishes: DishCatalogue;
+  /** The categories the orders were narrowed to (lib/finance/categories.ts), as the sheet
+   * names them — absent for the whole restaurant. `orders` and `totals` must already be
+   * the slice. */
+  categoryLabel?: string;
 };
 
 /**
@@ -49,6 +61,9 @@ export type ExportArgs = {
  * dashboard to speed up one button.
  */
 export async function exportOrdersWorkbook({
+  t,
+  tCount,
+  format,
   restaurantName,
   range,
   orders,
@@ -56,11 +71,12 @@ export async function exportOrdersWorkbook({
   currency,
   truncated,
   fields,
-  productNames,
+  dishes,
+  categoryLabel,
 }: ExportArgs): Promise<void> {
   const picked = new Set(fields);
   const columns = EXPORT_FIELDS.filter((field) => picked.has(field.key));
-  if (columns.length === 0) throw new Error('Pick at least one column to export.');
+  if (columns.length === 0) throw new Error(t('sheet.noColumns'));
 
   const imported = await import('exceljs');
   // The browser build is UMD, so depending on the bundler's interop the namespace either
@@ -72,7 +88,7 @@ export async function exportOrdersWorkbook({
   workbook.creator = 'Switch Finance';
   workbook.created = new Date();
 
-  const sheet = workbook.addWorksheet('Orders', {
+  const sheet = workbook.addWorksheet(t('sheet.name'), {
     views: [{ state: 'frozen', ySplit: 5 }],
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
@@ -91,24 +107,34 @@ export async function exportOrdersWorkbook({
   title.font = { bold: true, size: 16 };
   spanTitle(1);
 
-  const period = sheet.addRow([`Orders · ${range.label}`]);
+  const period = sheet.addRow([
+    categoryLabel
+      ? t('sheet.subtitleCategories', { categories: categoryLabel, period: format.range(range) })
+      : t('sheet.subtitle', { period: format.range(range) }),
+  ]);
   period.font = { size: 11, color: { argb: 'FF6B7280' } };
   spanTitle(2);
 
   if (truncated) {
-    const warning = sheet.addRow([
-      'WARNING: this range exceeded the export limit — the rows below are the earliest part of it, not the whole period.',
-    ]);
+    const warning = sheet.addRow([t('sheet.truncated')]);
     warning.font = { size: 10, bold: true, color: { argb: 'FFB42318' } };
     spanTitle(3);
   } else {
     sheet.addRow([]);
   }
 
-  sheet.addRow([]);
+  // Row 4 is spare on a whole-restaurant sheet. On a category sheet it says how shared
+  // orders were counted, since the Price of such an order won't match its receipt.
+  if (categoryLabel) {
+    const note = sheet.addRow([t('sheet.categoryNote')]);
+    note.font = { size: 10, italic: true, color: { argb: 'FF6B7280' } };
+    spanTitle(4);
+  } else {
+    sheet.addRow([]);
+  }
 
   // ---- header ---------------------------------------------------------------
-  const header = sheet.addRow(columns.map((field) => field.label));
+  const header = sheet.addRow(columns.map((field) => t(field.label)));
   header.eachCell((cell) => {
     cell.font = { bold: true, color: { argb: HEADER_TEXT } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND } };
@@ -119,7 +145,7 @@ export async function exportOrdersWorkbook({
   const firstDataRow = header.number + 1;
 
   // ---- rows -----------------------------------------------------------------
-  const context: ExportRowContext = { productNames, rate: totals.rate };
+  const context: ExportRowContext = { t, format, dishes, rate: totals.rate };
 
   for (const order of orders) {
     const row = sheet.addRow(columns.map((field) => field.value(order, context)));
@@ -153,9 +179,11 @@ export async function exportOrdersWorkbook({
   sheet.addRow([]);
   const totalsRow = sheet.addRow(
     columns.map((field, index) => {
-      if (index === 0) return 'Totals';
+      if (index === 0) return t('sheet.totals');
       if (field.kind === 'money') return sumOf(field);
-      if (field.key === 'customer') return `${orders.length} orders`;
+      if (field.key === 'customer') {
+        return tCount('orders.count', orders.length, { count: format.number(orders.length) });
+      }
       return '';
     }),
   );
@@ -169,7 +197,7 @@ export async function exportOrdersWorkbook({
 
   // The only balance that exists: orders are paid to the restaurant as they're taken, so
   // the commission is what it owes Switch, not a deduction from a payout.
-  const commissionLabel = 'Commission owed to Switch';
+  const commissionLabel = t('sheet.commissionOwed');
   // Under the Commission column where it's on the sheet, then Net sales, otherwise under
   // the rightmost money column, so the figure still lands where a reader's eye is already
   // totalling.
@@ -196,7 +224,7 @@ export async function exportOrdersWorkbook({
     // The sentence carries the number itself rather than the sheet losing the one figure
     // it exists to state.
     const commissionRow = sheet.addRow([
-      `${commissionLabel}: ${formatMoney(totals.commission, currency)}`,
+      t('sheet.commissionOwedValue', { amount: format.money(totals.commission, currency) }),
     ]);
     commissionRow.font = { bold: true };
   }
@@ -209,11 +237,15 @@ export async function exportOrdersWorkbook({
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
+  const restaurantStem = slug(restaurantName, t('sheet.file.restaurant'));
+  const stem = categoryLabel
+    ? `${restaurantStem}-${slug(categoryLabel, t('sheet.file.categories'))}`
+    : restaurantStem;
   download(
     new Blob([buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     }),
-    `${slug(restaurantName)}-orders-${range.from}-to-${range.to}.xlsx`,
+    `${stem}-${t('sheet.file.orders')}-${range.from}-${t('sheet.file.to')}-${range.to}.xlsx`,
   );
 }
 
@@ -230,15 +262,16 @@ function columnLetter(index: number): string {
 }
 
 /** Latin-safe filename stem. Arabic restaurant names survive fine inside the sheet, but
- * in a filename they get mangled by whatever the recipient's OS does with them. */
-function slug(name: string): string {
+ * in a filename they get mangled by whatever the recipient's OS does with them — so a
+ * name with nothing Latin left in it becomes `fallback`. */
+function slug(name: string, fallback: string): string {
   const cleaned = name
     .normalize('NFKD')
     .replace(/[^\w\s-]/g, '')
     .trim()
     .replace(/\s+/g, '-')
     .toLowerCase();
-  return cleaned || 'restaurant';
+  return cleaned || fallback;
 }
 
 function download(blob: Blob, filename: string): void {

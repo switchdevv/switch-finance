@@ -1,4 +1,9 @@
+import { orderLines } from '@/lib/finance/order-lines';
+import { orderState, orderStateKey } from '@/lib/finance/order-status';
 import { shortId } from '@/lib/format';
+import type { Formatters } from '@/lib/format';
+import type { MessageKey, Translate } from '@/lib/i18n/dictionary';
+import type { DishCatalogue } from '@/lib/services/foods';
 import type { OrderWithUser } from '@/types/order';
 
 /**
@@ -26,11 +31,16 @@ export type ExportFieldKey =
  * additionally marks the columns that get a total at the bottom of the sheet. */
 export type ExportFieldKind = 'text' | 'date' | 'time' | 'money';
 
-/** Everything a row needs beyond the order itself. */
+/** Everything a row needs beyond the order itself — including the language it is being
+ * written in, since several columns hold words rather than figures. */
 export type ExportRowContext = {
-  /** Food objectId → dish name, from lib/services/foods. Empty when the Products column
-   * wasn't selected; lines then fall back to a short id. */
-  productNames: Map<string, string>;
+  t: Translate;
+  /** Only the date/time columns hand `Intl` a value; everything else is a raw number, so
+   * that the recipient's Excel formats it with their own separators. */
+  format: Formatters;
+  /** The dishes the orders reference, from lib/services/foods — for the Products column.
+   * A dish missing from it falls back to a short id. */
+  dishes: DishCatalogue;
   /** The restaurant's current commission rate, as a fraction (0.15 = 15%) — for the
    * Commission column's per-order calculation. */
   rate: number;
@@ -38,75 +48,96 @@ export type ExportRowContext = {
 
 export type ExportField = {
   key: ExportFieldKey;
-  label: string;
+  /** Dictionary keys, not words: the column picker and the sheet header are both written
+   * in the language the dashboard is set to when the file is made. */
+  label: MessageKey;
   width: number;
   kind: ExportFieldKind;
   /** Second line under the checkbox, for columns whose contents the label alone doesn't
    * settle. */
-  hint?: string;
+  hint?: MessageKey;
   value: (order: OrderWithUser, context: ExportRowContext) => string | number | Date;
 };
 
 export const EXPORT_FIELDS: readonly ExportField[] = [
-  { key: 'date', label: 'Date', width: 12, kind: 'date', value: (o) => new Date(o.createdAt) },
-  { key: 'time', label: 'Time', width: 9, kind: 'time', value: (o) => new Date(o.createdAt) },
+  {
+    key: 'date',
+    label: 'sheet.fields.date',
+    width: 12,
+    kind: 'date',
+    value: (o) => new Date(o.createdAt),
+  },
+  {
+    key: 'time',
+    label: 'sheet.fields.time',
+    width: 9,
+    kind: 'time',
+    value: (o) => new Date(o.createdAt),
+  },
   {
     key: 'id',
-    label: 'Order',
+    label: 'sheet.fields.id',
     width: 14,
     kind: 'text',
     value: (order) => `#${shortId(order.objectId)}`,
   },
   {
     key: 'type',
-    label: 'Type',
+    label: 'sheet.fields.type',
     width: 12,
     kind: 'text',
-    value: (order) => (order.deliveryType === 'pickup' ? 'Pickup' : 'Delivery'),
+    value: (order, { t }) =>
+      order.deliveryType === 'pickup' ? t('common.pickup') : t('common.delivery'),
   },
   {
     key: 'customer',
-    label: 'Customer',
+    label: 'sheet.fields.customer',
     width: 26,
     kind: 'text',
     value: (order) => order.user?.fullname ?? '',
   },
-  { key: 'status', label: 'Status', width: 16, kind: 'text', value: statusLabel },
+  {
+    key: 'status',
+    label: 'sheet.fields.status',
+    width: 16,
+    kind: 'text',
+    value: (order, { t }) => t(orderStateKey(orderState(order).state)),
+  },
   {
     key: 'products',
-    label: 'Products',
+    label: 'sheet.fields.products',
     width: 60,
     kind: 'text',
-    hint: 'The dishes ordered, e.g. “Kefta ×2, Coke”',
+    hint: 'sheet.fields.productsHint',
     value: formatProducts,
   },
   {
     key: 'items',
-    label: 'Price',
+    label: 'sheet.fields.items',
     width: 14,
     kind: 'money',
     value: (order) => order.options?.itemsTotal ?? 0,
   },
   {
     key: 'discount',
-    label: 'Discount',
+    label: 'sheet.fields.discount',
     width: 14,
     kind: 'money',
     value: (order) => order.options?.discount ?? 0,
   },
   {
     key: 'net',
-    label: 'Net sales',
+    label: 'sheet.fields.net',
     width: 14,
     kind: 'money',
     value: (order) => (order.options?.itemsTotal ?? 0) - (order.options?.discount ?? 0),
   },
   {
     key: 'commission',
-    label: 'Commission',
+    label: 'sheet.fields.commission',
     width: 14,
     kind: 'money',
-    hint: 'Calculated from the order total using the restaurant’s commission rate — not stored on the order.',
+    hint: 'sheet.fields.commissionHint',
     value: (order, context) =>
       Math.trunc(
         ((order.options?.itemsTotal ?? 0) - (order.options?.discount ?? 0)) * context.rate,
@@ -114,24 +145,25 @@ export const EXPORT_FIELDS: readonly ExportField[] = [
   },
   {
     key: 'delivery',
-    label: 'Delivery fee',
+    label: 'sheet.fields.delivery',
     width: 14,
     kind: 'money',
     value: (order) => (order.options?.freeDelivery ? 0 : (order.options?.delivery ?? 0)),
   },
   {
     key: 'service',
-    label: 'Service fee',
+    label: 'sheet.fields.service',
     width: 14,
     kind: 'money',
     value: (order) => order.options?.service ?? 0,
   },
   {
     key: 'payment',
-    label: 'Payment',
+    label: 'sheet.fields.payment',
     width: 12,
     kind: 'text',
-    value: (order) => (order.options?.paymentMethod === 'creditcards' ? 'Card' : 'Cash'),
+    value: (order, { t }) =>
+      order.options?.paymentMethod === 'creditcards' ? t('sheet.payment.card') : t('sheet.payment.cash'),
   },
 ];
 
@@ -146,44 +178,9 @@ export const DEFAULT_EXPORT_FIELDS: readonly ExportFieldKey[] = [
   'commission',
 ];
 
-/** The one column that costs an extra round trip — the panel checks for it before paying
- * for the dish names. */
+/** The one column that needs the dish lookup — the panel checks for it before waiting on
+ * it. */
 export const PRODUCTS_FIELD: ExportFieldKey = 'products';
-
-type OrderLineRef = { foodId: string; quantity: number };
-
-/**
- * An order's lines as (dish id, quantity) pairs.
- *
- * `options.values` is index-aligned with the `food` pointer array and each entry is a
- * single-key record keyed by the dish's objectId — the same read the RN order screen does
- * (switch-food/src/screens/OrderDetails/OrderDetails.js:385). Orders written before
- * `values` existed still have the pointers, so those are the fallback and their quantity
- * is taken as one rather than guessed at.
- */
-function orderLines(order: OrderWithUser): OrderLineRef[] {
-  const values = order.options?.values ?? [];
-  const pointers = order.food ?? [];
-  const lines: OrderLineRef[] = [];
-
-  for (let index = 0; index < Math.max(values.length, pointers.length); index += 1) {
-    const entry = values[index] ? Object.entries(values[index])[0] : undefined;
-    const foodId = entry?.[0] ?? pointers[index]?.objectId;
-    if (!foodId) continue;
-    lines.push({ foodId, quantity: entry?.[1]?.quantity ?? 1 });
-  }
-
-  return lines;
-}
-
-/** Every dish id referenced across a range, to be resolved to names in one go. */
-export function collectProductIds(orders: OrderWithUser[]): string[] {
-  const ids = new Set<string>();
-  for (const order of orders) {
-    for (const line of orderLines(order)) ids.add(line.foodId);
-  }
-  return [...ids];
-}
 
 /**
  * The Products cell: plain inline text, comma-separated, quantities only where there's
@@ -193,17 +190,9 @@ export function collectProductIds(orders: OrderWithUser[]): string[] {
 function formatProducts(order: OrderWithUser, context: ExportRowContext): string {
   return orderLines(order)
     .map(({ foodId, quantity }) => {
-      const name = context.productNames.get(foodId) ?? `#${shortId(foodId)}`;
+      const name = context.dishes.get(foodId)?.name ?? `#${shortId(foodId)}`;
       return quantity > 1 ? `${name} ×${quantity}` : name;
     })
     .join(', ');
 }
 
-function statusLabel(order: OrderWithUser): string {
-  if (order.canceled) return 'Canceled';
-  const labels =
-    order.deliveryType === 'pickup'
-      ? ['Placed', 'Confirmed', 'Ready for pickup', 'Picked up']
-      : ['Placed', 'Confirmed', 'On the way', 'Delivered'];
-  return order.status !== undefined ? (labels[order.status] ?? 'Unknown') : 'Unknown';
-}

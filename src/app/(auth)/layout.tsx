@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { LanguageToggle } from '@/components/language-toggle';
 
 // No auth guard here on purpose — this layout serves the login page, which is the
 // one route an unauthenticated visitor must be able to reach. The mirror guard
@@ -18,6 +19,11 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           backgroundSize: '56px 56px',
         }}
       />
+      {/* The login card is the first screen anyone sees, so the language is chosen here
+          rather than only once signed in. */}
+      <div className="absolute end-5 top-5">
+        <LanguageToggle />
+      </div>
       {children}
     </div>
   );

@@ -1,11 +1,10 @@
-import { Chip } from '@heroui/react';
-import { ROLE_LABELS, type FinanceRole } from '@/lib/auth/access';
+'use client';
 
-const STATES = {
-  admin: { color: 'accent', label: ROLE_LABELS.admin },
-  member: { color: 'success', label: ROLE_LABELS.member },
-  none: { color: 'default', label: ROLE_LABELS.none },
-} as const;
+import { Chip } from '@heroui/react';
+import { roleKey, type FinanceRole } from '@/lib/auth/access';
+import { useI18n } from '@/lib/i18n/provider';
+
+const COLORS = { admin: 'accent', member: 'success', none: 'default' } as const;
 
 /**
  * An account's finance role, as one chip. Same construction as StatusChip: a `soft`
@@ -13,12 +12,13 @@ const STATES = {
  * that repeats the signal for anyone who can't separate the hues.
  */
 export function RoleChip({ role, size = 'md' }: { role: FinanceRole; size?: 'sm' | 'md' | 'lg' }) {
-  const state = role === 'admin' ? STATES.admin : role === 'member' ? STATES.member : STATES.none;
+  const { t } = useI18n();
+  const color = COLORS[role ?? 'none'];
 
   return (
-    <Chip color={state.color} variant="soft" size={size} className="gap-1.5 ps-2">
+    <Chip color={color} variant="soft" size={size} className="gap-1.5 ps-2">
       <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-current" />
-      <Chip.Label>{state.label}</Chip.Label>
+      <Chip.Label>{t(roleKey(role))}</Chip.Label>
     </Chip>
   );
 }

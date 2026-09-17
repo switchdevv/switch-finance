@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Alert, Button, Skeleton, Switch, Table } from '@heroui/react';
 import { STAFF_PAGE_SIZE, useStaff, useStaffCount } from '@/hooks/use-staff';
@@ -9,8 +9,9 @@ import { useSession } from '@/hooks/use-session';
 import type { StaffFilters as Filters } from '@/lib/services/staff';
 import { parseStaffFilters, staffFiltersToQuery } from '@/lib/url/staff-filters';
 import { financeRole } from '@/lib/auth/access';
-import { formatNumber, formatOrNone, initials } from '@/lib/format';
-import { parseErrorMessage } from '@/lib/parse/errors';
+import { formatOrNone, initials } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/provider';
+import { parseErrorKey } from '@/lib/parse/errors';
 import type { SwitchUser } from '@/types/user';
 import { PaginationBar } from '@/components/ui/pagination-bar';
 import { RoleChip } from '@/components/ui/role-chip';
@@ -18,10 +19,10 @@ import { AccessFilters } from '@/components/access/access-filters';
 import { FilterIcon } from '@/components/icons';
 
 const COLUMNS = [
-  { key: 'account', label: 'Account', className: 'min-w-[15rem] text-start' },
-  { key: 'email', label: 'Email', className: 'min-w-[13rem] text-start' },
-  { key: 'role', label: 'Role', className: 'w-[9.5rem] text-start' },
-  { key: 'access', label: 'Access', className: 'w-[11rem] text-start' },
+  { key: 'account', className: 'min-w-[15rem] text-start' },
+  { key: 'email', className: 'min-w-[13rem] text-start' },
+  { key: 'role', className: 'w-[9.5rem] text-start' },
+  { key: 'access', className: 'w-[11rem] text-start' },
 ] as const;
 
 function parsePage(raw: string | null): number {
@@ -30,6 +31,7 @@ function parsePage(raw: string | null): number {
 }
 
 export function AccessTable() {
+  const { t, format } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -76,11 +78,11 @@ export function AccessTable() {
         {filterBar}
         <Alert status="danger">
           <Alert.Content>
-            <Alert.Title>Couldn&apos;t load staff accounts</Alert.Title>
-            <Alert.Description>{parseErrorMessage(rowsQuery.error, 'fetch')}</Alert.Description>
+            <Alert.Title>{t('access.loadError')}</Alert.Title>
+            <Alert.Description>{t(parseErrorKey(rowsQuery.error, 'fetch'))}</Alert.Description>
           </Alert.Content>
           <Button variant="secondary" size="sm" onPress={() => rowsQuery.refetch()}>
-            Retry
+            {t('common.retry')}
           </Button>
         </Alert>
       </div>
@@ -101,8 +103,16 @@ export function AccessTable() {
         {filterBar}
         {rows.length > 0 && (
           <span className="text-caption text-muted tabular">
-            Showing {formatNumber(rangeStart)}–{formatNumber(rangeEnd)}
-            {total !== undefined && ` of ${formatNumber(total)}`}
+            {total !== undefined
+              ? t('common.showingOf', {
+                  start: format.number(rangeStart),
+                  end: format.number(rangeEnd),
+                  total: format.number(total),
+                })
+              : t('common.showing', {
+                  start: format.number(rangeStart),
+                  end: format.number(rangeEnd),
+                })}
           </span>
         )}
       </header>
@@ -115,7 +125,7 @@ export function AccessTable() {
         <Table variant="secondary" className="px-3 pb-1">
           <Table.ScrollContainer>
             <Table.Content
-              aria-label="Staff accounts"
+              aria-label={t('access.tableLabel')}
               className={
                 'min-w-[48rem] ' +
                 (rowsQuery.isPlaceholderData ? 'opacity-50 transition-opacity' : 'transition-opacity')
@@ -128,7 +138,7 @@ export function AccessTable() {
                     isRowHeader={column.key === 'account'}
                     className={`text-micro tracking-[0.12em] uppercase ${column.className}`}
                   >
-                    {column.label}
+                    {t(`access.columns.${column.key}`)}
                   </Table.Column>
                 ))}
               </Table.Header>
@@ -199,6 +209,7 @@ function AccountCell({ account }: { account: SwitchUser }) {
  * docs/finance-access-backend.md.
  */
 function AccessCell({ account, isSelf }: { account: SwitchUser; isSelf: boolean }) {
+  const { t } = useI18n();
   const setAccess = useSetFinanceAccess();
   const role = financeRole(account);
   // Optimistic only for the lifetime of the request: on failure it snaps back, so the
@@ -208,8 +219,8 @@ function AccessCell({ account, isSelf }: { account: SwitchUser; isSelf: boolean 
   if (role === 'admin') {
     return (
       <span className="text-caption text-muted">
-        Always
-        <span className="sr-only"> — admins have access by role</span>
+        {t('access.always')}
+        <span className="sr-only">{t('access.alwaysReason')}</span>
       </span>
     );
   }
@@ -230,19 +241,19 @@ function AccessCell({ account, isSelf }: { account: SwitchUser; isSelf: boolean 
         isSelected={granted}
         onChange={onChange}
         isDisabled={isSelf || setAccess.isPending}
-        aria-label={`Finance access for ${account.username ?? account.objectId}`}
+        aria-label={t('access.toggleLabel', { name: account.username ?? account.objectId })}
       >
         <Switch.Content>
           <Switch.Control>
             <Switch.Thumb />
           </Switch.Control>
         </Switch.Content>
-        <span className="text-caption">{granted ? 'Granted' : 'Not granted'}</span>
+        <span className="text-caption">{granted ? t('access.granted') : t('access.notGranted')}</span>
       </Switch>
-      {isSelf && <span className="text-caption text-muted">Your own account</span>}
+      {isSelf && <span className="text-caption text-muted">{t('access.ownAccount')}</span>}
       {setAccess.isError && (
         <span className="text-caption text-[var(--danger)]">
-          {parseErrorMessage(setAccess.error, 'grant')}
+          {t(parseErrorKey(setAccess.error, 'grant'))}
         </span>
       )}
     </div>
@@ -250,20 +261,34 @@ function AccessCell({ account, isSelf }: { account: SwitchUser; isSelf: boolean 
 }
 
 function EmptyRows() {
+  const { t } = useI18n();
+  // The field names stay code, untranslated, in either language — so the sentence is split
+  // on its placeholders and they are slotted back in as <code>.
+  const code = { appType: 'appType', staff: 'staff' } as const;
+  const parts = t('access.emptyBody').split(/\{(appType|staff)\}/);
+
   return (
     <div className="flex flex-col items-center gap-2 px-6 py-20 text-center">
       <span className="bg-surface-secondary text-muted mb-2 grid size-12 place-items-center rounded-2xl">
         <FilterIcon className="size-6" />
       </span>
-      <p className="text-h6 font-bold">No staff accounts found</p>
+      <p className="text-h6 font-bold">{t('access.emptyTitle')}</p>
       <p className="text-muted text-body max-w-prose">
-        Only accounts whose <code>appType</code> includes <code>staff</code> appear here.
+        {parts.map((part, index) =>
+          index % 2 === 1 ? (
+            <code key={index}>{code[part as keyof typeof code]}</code>
+          ) : (
+            <Fragment key={index}>{part}</Fragment>
+          ),
+        )}
       </p>
     </div>
   );
 }
 
 function TableSkeleton({ filterBar }: { filterBar: ReactNode }) {
+  const { t } = useI18n();
+
   return (
     <section className="border-border/70 bg-surface rounded-card shadow-card overflow-hidden border">
       {/* The filter bar stays live while rows load — it's what the admin is about to touch
@@ -276,7 +301,7 @@ function TableSkeleton({ filterBar }: { filterBar: ReactNode }) {
             key={column.key}
             className={`text-micro text-muted tracking-[0.12em] uppercase ${column.className}`}
           >
-            {column.label}
+            {t(`access.columns.${column.key}`)}
           </span>
         ))}
       </div>

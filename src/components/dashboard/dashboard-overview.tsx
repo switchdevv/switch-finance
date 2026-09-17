@@ -3,24 +3,24 @@
 import Link from 'next/link';
 import { Skeleton } from '@heroui/react';
 import { useRestaurantsCount } from '@/hooks/use-restaurants';
-import { formatNumber } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/provider';
 import { ChartIcon, ChevronRightIcon, ReceiptIcon, StoreIcon } from '@/components/icons';
 
 const UPCOMING = [
   {
-    title: 'Platform reports',
-    description:
-      'Commission across every restaurant at once. Per-restaurant orders, spreadsheets and invoices are already on each restaurant page.',
+    title: 'dashboard.reportsTitle',
+    description: 'dashboard.reportsBody',
     icon: ChartIcon,
   },
   {
-    title: 'Payments',
-    description: 'Track which commission invoices have been settled.',
+    title: 'dashboard.paymentsTitle',
+    description: 'dashboard.paymentsBody',
     icon: ReceiptIcon,
   },
 ] as const;
 
 export function DashboardOverview() {
+  const { t, format } = useI18n();
   // Reuses the list page's count query, so landing here warms the cache the
   // restaurants table reads a moment later rather than costing an extra round-trip.
   const countQuery = useRestaurantsCount();
@@ -40,25 +40,25 @@ export function DashboardOverview() {
         </span>
         <span className="relative flex min-w-0 flex-col">
           <span className="text-caption text-muted font-bold tracking-[0.08em] uppercase">
-            Restaurants on the platform
+            {t('dashboard.restaurantsCount')}
           </span>
           {countQuery.status === 'pending' ? (
             <Skeleton className="mt-1.5 h-8 w-24 rounded-md" />
           ) : (
             <span className="text-h1 tabular leading-tight font-bold">
-              {countQuery.status === 'success' ? formatNumber(countQuery.data) : '—'}
+              {countQuery.status === 'success' ? format.number(countQuery.data) : '—'}
             </span>
           )}
         </span>
         <span className="text-muted group-hover:text-accent-soft-foreground text-caption relative ms-auto flex shrink-0 items-center gap-1.5 font-bold transition-colors">
-          <span className="hidden sm:inline">Browse</span>
+          <span className="hidden sm:inline">{t('dashboard.browse')}</span>
           <ChevronRightIcon className="size-4" />
         </span>
       </Link>
 
       <div>
         <h2 className="text-micro text-muted mb-3 font-bold tracking-[0.16em] uppercase">
-          Coming soon
+          {t('dashboard.comingSoon')}
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {UPCOMING.map((card) => (
@@ -70,8 +70,8 @@ export function DashboardOverview() {
                 <card.icon className="size-5" />
               </span>
               <div>
-                <h3 className="text-h6 font-bold">{card.title}</h3>
-                <p className="text-muted text-body mt-1">{card.description}</p>
+                <h3 className="text-h6 font-bold">{t(card.title)}</h3>
+                <p className="text-muted text-body mt-1">{t(card.description)}</p>
               </div>
             </article>
           ))}

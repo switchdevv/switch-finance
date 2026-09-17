@@ -7,9 +7,9 @@ export default function AccessPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Administration"
-        title="Access"
-        description="Staff accounts that can be given access to Switch Finance. Admins always have it."
+        eyebrow="access.eyebrow"
+        title="access.title"
+        description="access.description"
       />
       {/* AccessTable reads useSearchParams() (page and filters), which Next requires to
           sit inside a Suspense boundary — omitting this passes in dev but fails

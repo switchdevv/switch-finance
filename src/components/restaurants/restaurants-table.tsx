@@ -11,15 +11,9 @@ import {
   restaurantFiltersToQuery,
 } from '@/lib/url/restaurant-filters';
 import { restaurantDetailHref } from '@/lib/url/routes';
-import {
-  formatDate,
-  formatNumber,
-  formatOrNone,
-  formatTime,
-  initials,
-  splitPhones,
-} from '@/lib/format';
-import { parseErrorMessage } from '@/lib/parse/errors';
+import { formatOrNone, initials, splitPhones } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/provider';
+import { parseErrorKey } from '@/lib/parse/errors';
 import type { Restaurant } from '@/types/restaurant';
 import { PaginationBar } from '@/components/ui/pagination-bar';
 import { StatusChip } from '@/components/ui/status-chip';
@@ -27,12 +21,12 @@ import { RestaurantFilters } from '@/components/restaurants/restaurant-filters';
 import { ChevronRightIcon, FilterIcon, StarIcon } from '@/components/icons';
 
 const COLUMNS = [
-  { key: 'name', label: 'Restaurant', className: 'min-w-[15rem] text-start' },
-  { key: 'phone', label: 'Phone', className: 'w-[9.5rem] text-start' },
-  { key: 'rating', label: 'Rating', className: 'w-[7.5rem] text-start' },
-  { key: 'orders', label: 'Orders', className: 'w-[6rem] text-end' },
-  { key: 'status', label: 'Status', className: 'w-[8rem] text-start' },
-  { key: 'created', label: 'Created', className: 'w-[8.5rem] text-start' },
+  { key: 'name', className: 'min-w-[15rem] text-start' },
+  { key: 'phone', className: 'w-[9.5rem] text-start' },
+  { key: 'rating', className: 'w-[7.5rem] text-start' },
+  { key: 'orders', className: 'w-[6rem] text-end' },
+  { key: 'status', className: 'w-[8rem] text-start' },
+  { key: 'created', className: 'w-[8.5rem] text-start' },
 ] as const;
 
 function parsePage(raw: string | null): number {
@@ -41,6 +35,7 @@ function parsePage(raw: string | null): number {
 }
 
 export function RestaurantsTable() {
+  const { t, format } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -86,11 +81,11 @@ export function RestaurantsTable() {
         {filterBar}
         <Alert status="danger">
           <Alert.Content>
-            <Alert.Title>Couldn&apos;t load restaurants</Alert.Title>
-            <Alert.Description>{parseErrorMessage(rowsQuery.error, 'fetch')}</Alert.Description>
+            <Alert.Title>{t('restaurants.loadError')}</Alert.Title>
+            <Alert.Description>{t(parseErrorKey(rowsQuery.error, 'fetch'))}</Alert.Description>
           </Alert.Content>
           <Button variant="secondary" size="sm" onPress={() => rowsQuery.refetch()}>
-            Retry
+            {t('common.retry')}
           </Button>
         </Alert>
       </div>
@@ -111,8 +106,16 @@ export function RestaurantsTable() {
         {filterBar}
         {rows.length > 0 && (
           <span className="text-caption text-muted tabular">
-            Showing {formatNumber(rangeStart)}–{formatNumber(rangeEnd)}
-            {total !== undefined && ` of ${formatNumber(total)}`}
+            {total !== undefined
+              ? t('common.showingOf', {
+                  start: format.number(rangeStart),
+                  end: format.number(rangeEnd),
+                  total: format.number(total),
+                })
+              : t('common.showing', {
+                  start: format.number(rangeStart),
+                  end: format.number(rangeEnd),
+                })}
           </span>
         )}
       </header>
@@ -126,7 +129,7 @@ export function RestaurantsTable() {
         <Table variant="secondary" className="px-3 pb-1">
           <Table.ScrollContainer>
             <Table.Content
-              aria-label="Restaurants"
+              aria-label={t('restaurants.tableLabel')}
               // While the next page is in flight the previous page stays mounted
               // (keepPreviousData); dimming it marks the rows as stale without the
               // layout collapse a skeleton swap would cause.
@@ -144,11 +147,11 @@ export function RestaurantsTable() {
                     isRowHeader={column.key === 'name'}
                     className={`text-micro tracking-[0.12em] uppercase ${column.className}`}
                   >
-                    {column.label}
+                    {t(`restaurants.columns.${column.key}`)}
                   </Table.Column>
                 ))}
                 <Table.Column className="w-12">
-                  <span className="sr-only">Open</span>
+                  <span className="sr-only">{t('restaurants.columns.open')}</span>
                 </Table.Column>
               </Table.Header>
               <Table.Body items={rows}>
@@ -165,7 +168,7 @@ export function RestaurantsTable() {
                     </Table.Cell>
                     <Table.Cell className="text-end whitespace-nowrap">
                       <span className="tabular font-bold">
-                        {formatNumber(restaurant.ordersTotal)}
+                        {format.number(restaurant.ordersTotal)}
                       </span>
                     </Table.Cell>
                     <Table.Cell className="whitespace-nowrap">
@@ -173,16 +176,16 @@ export function RestaurantsTable() {
                     </Table.Cell>
                     <Table.Cell className="whitespace-nowrap">
                       <span className="text-body tabular block">
-                        {formatDate(restaurant.createdAt)}
+                        {format.date(restaurant.createdAt)}
                       </span>
                       <span className="text-caption text-muted tabular block">
-                        {formatTime(restaurant.createdAt)}
+                        {format.time(restaurant.createdAt)}
                       </span>
                     </Table.Cell>
                     <Table.Cell>
                       <Link
                         href={restaurantDetailHref(restaurant.objectId, buildHref(page))}
-                        aria-label={`Open ${formatOrNone(restaurant.name)}`}
+                        aria-label={t('restaurants.openRow', { name: formatOrNone(restaurant.name) })}
                         className="text-muted hover:bg-accent-soft hover:text-accent-soft-foreground focus-visible:ring-focus grid size-8 place-items-center rounded-lg transition-colors outline-none focus-visible:ring-2"
                       >
                         <ChevronRightIcon className="size-4" />
@@ -255,6 +258,7 @@ function Thumbnail({ url, name }: { url: string | undefined; name: string | unde
 }
 
 function PhoneCell({ phone }: { phone: string | undefined }) {
+  const { t } = useI18n();
   const numbers = splitPhones(phone);
   if (numbers.length === 0) return <span className="text-muted">—</span>;
 
@@ -275,41 +279,46 @@ function PhoneCell({ phone }: { phone: string | undefined }) {
         </a>
       )}
       {numbers.length > 2 && (
-        <span className="text-caption text-muted">+{numbers.length - 2} more</span>
+        <span className="text-caption text-muted">{t('restaurants.morePhones', { count: numbers.length - 2 })}</span>
       )}
     </span>
   );
 }
 
 function RatingCell({ rating, reviews }: { rating: number | undefined; reviews: number | undefined }) {
+  const { t, format } = useI18n();
   // A 0.0 average with no reviews isn't a bad restaurant, it's an unrated one —
   // showing "0.0 (0)" next to genuine 4.3s actively misleads.
   if (rating === undefined || !reviews) {
-    return <span className="text-muted text-caption">Unrated</span>;
+    return <span className="text-muted text-caption">{t('restaurants.unrated')}</span>;
   }
 
   return (
     <span className="flex items-center gap-1.5">
       <StarIcon className="size-3.5 text-[var(--warning)]" />
-      <span className="text-body tabular font-bold">{rating.toFixed(1)}</span>
-      <span className="text-caption text-muted tabular">({formatNumber(reviews)})</span>
+      <span className="text-body tabular font-bold">{format.decimal(rating)}</span>
+      <span className="text-caption text-muted tabular">({format.number(reviews)})</span>
     </span>
   );
 }
 
 function EmptyRows() {
+  const { t } = useI18n();
+
   return (
     <div className="flex flex-col items-center gap-2 px-6 py-20 text-center">
       <span className="bg-surface-secondary text-muted mb-2 grid size-12 place-items-center rounded-2xl">
         <FilterIcon className="size-6" />
       </span>
-      <p className="text-h6 font-bold">No restaurants found</p>
-      <p className="text-muted text-body">No restaurant matches these filters.</p>
+      <p className="text-h6 font-bold">{t('restaurants.emptyTitle')}</p>
+      <p className="text-muted text-body">{t('restaurants.emptyBody')}</p>
     </div>
   );
 }
 
 function TableSkeleton({ filterBar }: { filterBar: ReactNode }) {
+  const { t } = useI18n();
+
   return (
     <section className="border-border/70 bg-surface rounded-card shadow-card overflow-hidden border">
       {/* The filter bar stays live while rows load — it's what the user is about to
@@ -322,7 +331,7 @@ function TableSkeleton({ filterBar }: { filterBar: ReactNode }) {
             key={column.key}
             className={`text-micro text-muted tracking-[0.12em] uppercase ${column.className}`}
           >
-            {column.label}
+            {t(`restaurants.columns.${column.key}`)}
           </span>
         ))}
       </div>

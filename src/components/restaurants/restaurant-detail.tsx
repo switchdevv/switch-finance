@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Alert, Button, Chip, Skeleton, Typography } from '@heroui/react';
 import { useRestaurant } from '@/hooks/use-restaurants';
-import { formatDateTime, formatNumber, formatOrNone, splitPhones } from '@/lib/format';
-import { parseErrorMessage } from '@/lib/parse/errors';
+import { formatOrNone, splitPhones } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/provider';
+import { parseErrorKey } from '@/lib/parse/errors';
 import type { RestaurantWithRelations } from '@/types/restaurant';
 import { readRestaurantId, RESTAURANTS_HREF } from '@/lib/url/routes';
 import { StatusChip } from '@/components/ui/status-chip';
@@ -20,6 +21,7 @@ import {
 } from '@/components/icons';
 
 export function RestaurantDetail() {
+  const { t, format } = useI18n();
   const searchParams = useSearchParams();
   const objectId = readRestaurantId(searchParams);
   const backHref = safeBackHref(searchParams.get('back'));
@@ -51,11 +53,11 @@ export function RestaurantDetail() {
     return (
       <Alert status="danger">
         <Alert.Content>
-          <Alert.Title>Couldn&apos;t load this restaurant</Alert.Title>
-          <Alert.Description>{parseErrorMessage(error, 'fetch')}</Alert.Description>
+          <Alert.Title>{t('restaurant.loadError')}</Alert.Title>
+          <Alert.Description>{t(parseErrorKey(error, 'fetch'))}</Alert.Description>
         </Alert.Content>
         <Button variant="secondary" size="sm" onPress={() => refetch()}>
-          Retry
+          {t('common.retry')}
         </Button>
       </Alert>
     );
@@ -82,24 +84,28 @@ export function RestaurantDetail() {
       {/* Row timestamps are provenance, not content — a muted footer keeps them
           available without giving them a card of their own next to the real data. */}
       <p className="text-caption text-muted tabular">
-        Created {formatDateTime(restaurant.createdAt)} · Updated{' '}
-        {formatDateTime(restaurant.updatedAt)}
+        {t('restaurant.provenance', {
+          created: format.dateTime(restaurant.createdAt),
+          updated: format.dateTime(restaurant.updatedAt),
+        })}
       </p>
     </div>
   );
 }
 
 function NotFound({ backHref }: { backHref: string }) {
+  const { t } = useI18n();
+
   return (
     <div className="border-border/70 bg-surface rounded-card shadow-card flex flex-col items-center gap-3 border px-6 py-20 text-center">
       <span className="bg-surface-secondary text-muted mb-1 grid size-12 place-items-center rounded-2xl">
         <StoreIcon className="size-6" />
       </span>
       <Typography.Heading level={2} className="text-h5 font-bold">
-        Restaurant not found
+        {t('restaurant.notFoundTitle')}
       </Typography.Heading>
       <Typography.Paragraph className="text-muted text-body">
-        It may have been removed, or the link is incorrect.
+        {t('restaurant.notFoundBody')}
       </Typography.Paragraph>
       <BackLink href={backHref} className="mt-2" />
     </div>
@@ -117,12 +123,13 @@ function safeBackHref(raw: string | null): string {
 }
 
 function Hero({ restaurant }: { restaurant: RestaurantWithRelations }) {
+  const { t, tCount, format } = useI18n();
   const isRated = restaurant.rating !== undefined && !!restaurant.reviews;
   const phones = splitPhones(restaurant.phone);
   const flags = [
-    restaurant.isFeatured && 'Featured',
-    restaurant.isDiscount && 'Discount',
-    restaurant.isPromo && 'Promo',
+    restaurant.isFeatured && t('restaurants.flags.isFeatured'),
+    restaurant.isDiscount && t('restaurants.flags.isDiscount'),
+    restaurant.isPromo && t('restaurants.flags.isPromo'),
   ].filter((flag): flag is string => Boolean(flag));
 
   return (
@@ -165,7 +172,7 @@ function Hero({ restaurant }: { restaurant: RestaurantWithRelations }) {
                 className="text-caption text-accent-soft-foreground hover:bg-accent-soft focus-visible:ring-focus border-border/70 flex shrink-0 items-center gap-1.5 rounded-pill border px-3 py-1.5 font-bold transition-colors outline-none focus-visible:ring-2"
               >
                 <MapPinIcon className="size-3.5" />
-                Open in Maps
+                {t('restaurant.openInMaps')}
                 <ExternalLinkIcon className="size-3.5" />
               </a>
             )}
@@ -176,9 +183,11 @@ function Hero({ restaurant }: { restaurant: RestaurantWithRelations }) {
             {isRated && (
               <span className="text-body flex items-center gap-1.5">
                 <StarIcon className="size-4 text-[var(--warning)]" />
-                <span className="tabular font-bold">{restaurant.rating!.toFixed(1)}</span>
+                <span className="tabular font-bold">{format.decimal(restaurant.rating!)}</span>
                 <span className="text-muted text-caption tabular">
-                  ({formatNumber(restaurant.reviews)} reviews)
+                  {tCount('restaurant.reviews', restaurant.reviews ?? 0, {
+                    count: format.number(restaurant.reviews),
+                  })}
                 </span>
               </span>
             )}
@@ -230,13 +239,15 @@ function Hero({ restaurant }: { restaurant: RestaurantWithRelations }) {
 }
 
 function BackLink({ href, className }: { href: string; className?: string }) {
+  const { t } = useI18n();
+
   return (
     <Link
       href={href}
       className={`text-caption text-muted hover:text-foreground hover:border-border-secondary border-border/70 bg-surface focus-visible:ring-focus flex w-fit items-center gap-2 rounded-pill border px-3 py-1.5 font-bold transition-colors outline-none focus-visible:ring-2 ${className ?? ''}`}
     >
       <ArrowLeftIcon className="size-3.5" />
-      Back to restaurants
+      {t('restaurant.back')}
     </Link>
   );
 }

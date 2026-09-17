@@ -1,10 +1,9 @@
-import { Chip } from '@heroui/react';
+'use client';
 
-const STATES = {
-  live: { color: 'success', label: 'Live' },
-  paused: { color: 'warning', label: 'Paused' },
-  unapproved: { color: 'default', label: 'Not approved' },
-} as const;
+import { Chip } from '@heroui/react';
+import { useI18n } from '@/lib/i18n/provider';
+
+const COLORS = { live: 'success', paused: 'warning', unapproved: 'default' } as const;
 
 /**
  * Restaurant has two independent boolean flags that are easy to conflate:
@@ -21,16 +20,17 @@ export function StatusChip({
   active: boolean | undefined;
   size?: 'sm' | 'md' | 'lg';
 }) {
-  const state = !enabled ? STATES.unapproved : !active ? STATES.paused : STATES.live;
+  const { t } = useI18n();
+  const state = !enabled ? 'unapproved' : !active ? 'paused' : 'live';
 
   return (
     // `soft` rather than the default grey fill: three statuses that differ only by
     // label colour are hard to scan down a column, and the tinted background does
     // the sorting for the eye before the text is read. The dot carries the same
     // signal again for anyone who can't separate the hues.
-    <Chip color={state.color} variant="soft" size={size} className="gap-1.5 ps-2">
+    <Chip color={COLORS[state]} variant="soft" size={size} className="gap-1.5 ps-2">
       <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-current" />
-      <Chip.Label>{state.label}</Chip.Label>
+      <Chip.Label>{t(`restaurants.status.${state}`)}</Chip.Label>
     </Chip>
   );
 }

@@ -22,18 +22,14 @@ import {
  */
 export const BUSINESS_TIME_ZONE = 'Africa/Algiers';
 
-/** Week starts Monday, matching the en-GB locale the whole dashboard formats with. */
+/** Week starts Monday — a business rule, not a display one, so it stays put whichever
+ * language the dashboard is read in (en-GB and fr-FR agree on it anyway). */
 const WEEK_LOCALE = 'en-GB';
 
 export type RangePreset = 'today' | 'week' | 'month' | 'year' | 'custom';
 
-export const RANGE_PRESETS: { key: RangePreset; label: string }[] = [
-  { key: 'today', label: 'Today' },
-  { key: 'week', label: 'This week' },
-  { key: 'month', label: 'This month' },
-  { key: 'year', label: 'This year' },
-  { key: 'custom', label: 'Custom' },
-];
+/** In picker order. Their names are the dictionary's (`range.presets.*`). */
+export const RANGE_PRESETS: readonly RangePreset[] = ['today', 'week', 'month', 'year', 'custom'];
 
 export type DateRange = {
   preset: RangePreset;
@@ -41,16 +37,11 @@ export type DateRange = {
   start: Date;
   /** Inclusive last instant of the last day (23:59:59.999 Algiers). */
   end: Date;
-  /** ISO calendar dates (YYYY-MM-DD) — what goes in the URL and in filenames. */
+  /** ISO calendar dates (YYYY-MM-DD) — what goes in the URL and in filenames. The
+   * human-readable period is `format.range(range)`, in the reader's language. */
   from: string;
   to: string;
-  label: string;
 };
-
-const LABEL_FORMAT = new Intl.DateTimeFormat('en-GB', {
-  timeZone: BUSINESS_TIME_ZONE,
-  dateStyle: 'medium',
-});
 
 /** Parses a YYYY-MM-DD string, returning null rather than throwing on junk from the URL. */
 export function parseCalendarDate(value: string | null | undefined): CalendarDate | null {
@@ -121,15 +112,10 @@ export function resolveRange(
     end,
     from: startDate.toString(),
     to: endDate.toString(),
-    label: formatRangeLabel(start, end, startDate.toString() === endDate.toString()),
   };
-}
-
-function formatRangeLabel(start: Date, end: Date, sameDay: boolean): string {
-  return sameDay ? LABEL_FORMAT.format(start) : `${LABEL_FORMAT.format(start)} – ${LABEL_FORMAT.format(end)}`;
 }
 
 /** Narrows an arbitrary `?range=` value to a preset, defaulting to today. */
 export function parsePreset(raw: string | null | undefined): RangePreset {
-  return RANGE_PRESETS.some((preset) => preset.key === raw) ? (raw as RangePreset) : 'today';
+  return (RANGE_PRESETS as readonly string[]).includes(raw ?? '') ? (raw as RangePreset) : 'today';
 }
