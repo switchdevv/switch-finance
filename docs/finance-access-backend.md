@@ -1,8 +1,9 @@
 # Switch Finance access control — backend requirements
 
 **Audience:** whoever owns the Parse Server behind `api.switchfood.net`.
-**Status:** the web client (this repo) is fully wired and shipped. Everything below is
-still missing on the server, and until it lands the client-side gate is a **UX gate, not a
+**Status:** the web client (this repo) is fully wired and shipped. §2 and §3 are built in
+switch-server-v2 (`src/cloud/functions/staff-access.ts`, `beforeSave _User`, D-22) and ship with
+it; legacy switch-server never gets them. Until v2 serves production the client-side gate is a **UX gate, not a
 security boundary**.
 
 ## Why the client can't do this alone

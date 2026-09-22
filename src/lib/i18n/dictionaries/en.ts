@@ -270,6 +270,13 @@ export const en = {
     totals: 'Totals',
     commissionOwed: 'Commission owed to Switch',
     commissionOwedValue: 'Commission owed to Switch: {amount}',
+    commissionPeriod: 'Commission for this period',
+    commissionPeriodValue: 'Commission for this period: {amount}',
+    previousBalance: 'Previous balance',
+    previousBalanceNoted: 'Previous balance ({note})',
+    totalDue: 'Total due to Switch',
+    /** Used only on a sheet with no money column to hang a figure under. */
+    labelledValue: '{label}: {amount}',
     noColumns: 'Pick at least one column to export.',
     fields: {
       date: 'Date',
@@ -334,14 +341,17 @@ export const en = {
       items: 'Items total',
       discounts: 'Discounts',
       base: 'Commission base',
-      rate: 'Commission rate',
       average: 'Average order',
       commissionDue: 'Commission due to Switch',
+      /** Replaces commissionDue as a plain row when a previous balance is added below
+       * it, so the bold line at the foot is the one figure to pay. */
+      commissionPeriod: 'Commission for this period',
+      previousBalance: 'Previous balance',
+      previousBalanceNoted: 'Previous balance ({note})',
+      totalDue: 'Total due to Switch',
       grossSales: 'Gross sales for the period',
     },
     statementCommission: 'Commission owed to Switch on this period at {rate}:',
-    fees:
-      'Charged to customers on top of the food and excluded from commission: delivery {delivery}, service {service}.',
     linesTitle: 'Orders in this period',
     lines: {
       order: 'Order',
@@ -352,15 +362,42 @@ export const en = {
       net: 'Net',
     },
     footnote: {
-      billable:
-        'Figures cover orders that were not canceled and reached at least the “on the way / ready” stage, matching what the restaurant sees in its own Switch app.',
-      settlement:
-        "Orders are settled with the restaurant as they are taken, so the only balance shown here is the commission owed to Switch. It is calculated at the restaurant's current rate of {rate}, applied to items total less discounts. Orders do not store the rate that was in force when they were placed, so a later change to the rate will change the figures on a reprint of this period.",
       scope:
         'This document covers only the dishes in {categories}, going by the menu section each dish is in today. An order that also contained other dishes is counted at the share of its items total those dishes make up, with its discount and fees shared out the same way and rounded to the nearest unit.',
     },
-    /** The browser offers this as the PDF's filename when saving. */
+    /** The browser offers this as the PDF's filename when saving. It no longer reaches
+     * paper — the print stylesheet drops the browser's header and footer. */
     documentTitle: '{document} — {restaurant} — {period}',
+  },
+
+  invoiceDialog: {
+    /** Keyed by where the dialog was opened from — the restaurant page, or the
+     * document itself. */
+    title: {
+      open: 'Create invoice',
+      print: 'Print invoice',
+    },
+    subtitle: {
+      open: 'What goes on the document. It opens in a new tab.',
+      print: 'What goes on the document, before it goes to paper.',
+    },
+    submit: {
+      open: 'Open invoice',
+      print: 'Print / Save as PDF',
+    },
+    wholeRestaurant: 'None picked: the whole restaurant is invoiced.',
+    narrowed:
+      'Only dishes in these categories are invoiced. An order that also has other dishes counts at their share of its price, with its discount and fees shared the same way.',
+    noColumns: 'No order table will be printed — only the summary and the total.',
+  },
+
+  carryOver: {
+    section: 'Previous balance',
+    amount: 'Amount still owed',
+    note: 'What it is for',
+    notePlaceholder: 'e.g. August 2026',
+    hint: 'Leave at zero if nothing is outstanding from before this period.',
+    included: 'Added after this period’s commission: {amount}. Nothing is charged on it.',
   },
 
   access: {

@@ -3,9 +3,13 @@
 import { useMemo, useState } from 'react';
 import { Button, Checkbox, Label, Modal, Skeleton } from '@heroui/react';
 import { DEFAULT_EXPORT_FIELDS, EXPORT_FIELDS, type ExportFieldKey } from '@/lib/export/fields';
+import { NO_CARRY_OVER, type CarryOver } from '@/lib/finance/carry-over';
 import { UNCATEGORISED, type OrderCategory } from '@/lib/finance/categories';
 import type { DateRange } from '@/lib/finance/date-range';
 import { useI18n } from '@/lib/i18n/provider';
+import type { CurrencyCode } from '@/types/city';
+import { CarryOverFields } from '@/components/ui/carry-over-fields';
+import { SectionHeader } from '@/components/ui/section-header';
 import { SheetIcon } from '@/components/icons';
 
 type ExportModalProps = {
@@ -20,7 +24,9 @@ type ExportModalProps = {
   /** Billable orders an export of these categories would hold; empty is the whole
    * restaurant. Only asked once the categories have loaded, or for the whole restaurant. */
   countOrders: (categoryIds: readonly string[]) => number;
-  onExport: (fields: ExportFieldKey[], categoryIds: string[]) => void;
+  /** For the carry-over field's own preview of the amount being typed. */
+  currency: CurrencyCode | undefined;
+  onExport: (fields: ExportFieldKey[], categoryIds: string[], carryOver: CarryOver) => void;
 };
 
 /**
@@ -40,11 +46,16 @@ export function ExportModal({
   categoriesStatus,
   onRetryCategories,
   countOrders,
+  currency,
   onExport,
 }: ExportModalProps) {
   const { t, tCount, format } = useI18n();
   const [fields, setFields] = useState<ExportFieldKey[]>([...DEFAULT_EXPORT_FIELDS]);
   const [pickedCategories, setPickedCategories] = useState<string[]>([]);
+  // Unlike the columns, this doesn't survive the dialog closing: it's a figure about one
+  // moment in an account, not a preference, and a stale one silently re-billed on the
+  // next export would be worse than typing it again.
+  const [carryOver, setCarryOver] = useState<CarryOver>(NO_CARRY_OVER);
 
   const hasCategories = categoriesStatus === 'success';
 
@@ -205,6 +216,15 @@ export function ExportModal({
                   </p>
                 )}
               </section>
+
+              <section className="flex flex-col gap-3">
+                <SectionHeader title={t('carryOver.section')} />
+                <CarryOverFields
+                  value={carryOver}
+                  currency={currency}
+                  onChange={setCarryOver}
+                />
+              </section>
             </Modal.Body>
 
             <Modal.Footer>
@@ -220,7 +240,7 @@ export function ExportModal({
                 variant="primary"
                 size="sm"
                 isDisabled={fields.length === 0 || isExporting || !orderCount}
-                onPress={() => onExport(fields, categoryIds)}
+                onPress={() => onExport(fields, categoryIds, carryOver)}
               >
                 <SheetIcon className="size-4" />
                 {isExporting ? t('common.preparing') : t('exportDialog.export')}
@@ -230,28 +250,5 @@ export function ExportModal({
         </Modal.Container>
       </Modal.Backdrop>
     </Modal>
-  );
-}
-
-function SectionHeader({
-  title,
-  action,
-}: {
-  title: string;
-  action?: { label: string; onPress: () => void };
-}) {
-  return (
-    <div className="flex min-h-7 items-center justify-between gap-3">
-      <p className="text-caption text-muted font-bold tracking-wide uppercase">{title}</p>
-      {action && (
-        <button
-          type="button"
-          className="text-caption text-accent focus-visible:ring-focus rounded-pill px-2 py-1 font-bold outline-none focus-visible:ring-2"
-          onClick={action.onPress}
-        >
-          {action.label}
-        </button>
-      )}
-    </div>
   );
 }

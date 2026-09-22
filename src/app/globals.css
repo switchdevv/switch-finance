@@ -277,6 +277,19 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   HeroUI corrections.
+   --------------------------------------------------------------------------- */
+
+/* A number field's group is laid out as `40px 1fr 40px` — a fixed column for each
+   stepper button, whether or not the button is rendered. A field with no steppers
+   therefore puts its input in the first 40px column and clips the value ("1,200 DA"
+   shows as "1,2"). Money fields have no business stepping by ones, so where the
+   buttons are absent the input gets the whole group. */
+.number-field__group:not(:has([slot='increment'], [slot='decrement'])) {
+  grid-template-columns: 1fr;
+}
+
 /* Brand gradient, used for the wordmark and the login card's rim light. */
 @utility brand-gradient {
   background-image: linear-gradient(135deg, var(--brand-400) 0%, var(--brand-600) 55%, var(--brand-lime) 130%);
@@ -297,9 +310,14 @@
    not about the screen.
    --------------------------------------------------------------------------- */
 @media print {
+  /* Zero margin, with the page's own padding standing in for it below. This is the only
+     way to drop the browser's own header and footer — the document title and the source
+     URL it stamps into the top and bottom of every sheet — which have no place on an
+     invoice sent to a restaurant. The moment a page margin exists, Chrome and Safari
+     fill it. */
   @page {
     size: A4;
-    margin: 12mm;
+    margin: 0;
   }
 
   html,
@@ -312,9 +330,11 @@
     display: none !important;
   }
 
+  /* The margin @page gave up. Bottom is wider than top so a table that runs to the
+     foot of a sheet doesn't sit on the edge of the paper. */
   .invoice-sheet {
     box-shadow: none !important;
-    padding: 0 !important;
+    padding: 12mm 12mm 14mm !important;
     max-width: none !important;
   }
 
@@ -322,6 +342,16 @@
      month is a column of unlabelled numbers. */
   thead {
     display: table-header-group;
+  }
+
+  /* With no page margin, that repeated header is the first ink on every sheet after the
+     first, and would otherwise start hard against the edge of the paper — inside most
+     printers' unprintable band. The deeper band is the continuation pages' top gutter;
+     it costs page one a slightly taller header row, which reads as design rather than as
+     a mistake. */
+  .invoice-sheet thead th {
+    padding-top: 6mm;
+    padding-bottom: 3mm;
   }
 
   tr,

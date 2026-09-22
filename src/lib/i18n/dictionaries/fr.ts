@@ -271,6 +271,12 @@ export const fr: Dictionary = {
     totals: 'Totaux',
     commissionOwed: 'Commission due à Switch',
     commissionOwedValue: 'Commission due à Switch : {amount}',
+    commissionPeriod: 'Commission de la période',
+    commissionPeriodValue: 'Commission de la période : {amount}',
+    previousBalance: 'Solde antérieur',
+    previousBalanceNoted: 'Solde antérieur ({note})',
+    totalDue: 'Total dû à Switch',
+    labelledValue: '{label} : {amount}',
     noColumns: 'Choisissez au moins une colonne à exporter.',
     fields: {
       date: 'Date',
@@ -334,14 +340,15 @@ export const fr: Dictionary = {
       items: 'Total des articles',
       discounts: 'Remises',
       base: 'Base de commission',
-      rate: 'Taux de commission',
       average: 'Panier moyen',
       commissionDue: 'Commission due à Switch',
+      commissionPeriod: 'Commission de la période',
+      previousBalance: 'Solde antérieur',
+      previousBalanceNoted: 'Solde antérieur ({note})',
+      totalDue: 'Total dû à Switch',
       grossSales: 'Ventes brutes de la période',
     },
     statementCommission: 'Commission due à Switch sur cette période au taux de {rate} :',
-    fees:
-      'Payés par les clients en plus des repas et exclus de la commission : livraison {delivery}, service {service}.',
     linesTitle: 'Commandes de la période',
     lines: {
       order: 'Commande',
@@ -352,14 +359,38 @@ export const fr: Dictionary = {
       net: 'Net',
     },
     footnote: {
-      billable:
-        "Les chiffres portent sur les commandes non annulées ayant atteint au moins l'étape « en route / prête », conformément à ce que le restaurant voit dans sa propre application Switch.",
-      settlement:
-        "Les commandes sont réglées au restaurant au moment où elles sont passées : le seul solde indiqué ici est donc la commission due à Switch. Elle est calculée au taux actuel du restaurant, {rate}, appliqué au total des articles après remises. Les commandes n'enregistrent pas le taux en vigueur au moment où elles ont été passées : une modification ultérieure du taux changera les chiffres d'une réimpression de cette période.",
       scope:
         "Ce document ne porte que sur les plats de : {categories}, selon la section de menu où se trouve chaque plat aujourd'hui. Une commande contenant aussi d'autres plats est comptée pour la part de son total d'articles que représentent ces plats ; sa remise et ses frais sont répartis de la même façon et arrondis à l'unité.",
     },
     documentTitle: '{document} — {restaurant} — {period}',
+  },
+
+  invoiceDialog: {
+    title: {
+      open: 'Créer la facture',
+      print: 'Imprimer la facture',
+    },
+    subtitle: {
+      open: 'Ce qui figure sur le document. Il s’ouvre dans un nouvel onglet.',
+      print: 'Ce qui figure sur le document, avant impression.',
+    },
+    submit: {
+      open: 'Ouvrir la facture',
+      print: 'Imprimer / Enregistrer en PDF',
+    },
+    wholeRestaurant: 'Aucune sélection : tout le restaurant est facturé.',
+    narrowed:
+      "Seuls les plats de ces catégories sont facturés. Une commande qui contient aussi d'autres plats compte pour leur part de son prix, et sa remise et ses frais sont répartis de la même façon.",
+    noColumns: 'Aucun tableau de commandes ne sera imprimé — seulement le récapitulatif et le total.',
+  },
+
+  carryOver: {
+    section: 'Solde antérieur',
+    amount: 'Montant restant dû',
+    note: 'À quoi il correspond',
+    notePlaceholder: 'ex. août 2026',
+    hint: "Laissez à zéro si rien n'est dû au titre des périodes précédentes.",
+    included: 'Ajouté après la commission de la période : {amount}. Aucune commission ne s’y applique.',
   },
 
   access: {

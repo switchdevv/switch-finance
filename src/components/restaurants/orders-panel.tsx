@@ -6,11 +6,13 @@ import { Alert, Button, useOverlayState } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { orderCatalogueQuery, useOrderCategories } from '@/hooks/use-order-categories';
 import { useOrdersInRange } from '@/hooks/use-orders';
+import { NO_CARRY_OVER, type CarryOver } from '@/lib/finance/carry-over';
 import { categoryLabel, sliceOrders } from '@/lib/finance/categories';
 import { parsePreset, resolveRange, type RangePreset } from '@/lib/finance/date-range';
 import { computeTotals } from '@/lib/finance/totals';
 import { exportOrdersWorkbook } from '@/lib/export/excel';
 import { PRODUCTS_FIELD, type ExportFieldKey } from '@/lib/export/fields';
+import { defaultInvoiceOptions, type InvoiceOptions } from '@/lib/invoice/options';
 import { useI18n } from '@/lib/i18n/provider';
 import { parseErrorKey } from '@/lib/parse/errors';
 import type { OrderScope } from '@/lib/services/orders';
@@ -20,6 +22,7 @@ import { DateRangeToolbar } from '@/components/ui/date-range-toolbar';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { StatTile } from '@/components/ui/stat-tile';
 import { ExportModal } from '@/components/restaurants/export-modal';
+import { InvoiceOptionsModal } from '@/components/invoice/invoice-options-modal';
 import { OrdersTable } from '@/components/restaurants/orders-table';
 import { ChartIcon, PrinterIcon, ReceiptIcon, SheetIcon, StoreIcon, TagIcon } from '@/components/icons';
 
@@ -45,7 +48,11 @@ export function OrdersPanel({ restaurant }: { restaurant: RestaurantWithRelation
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const exportDialog = useOverlayState();
+  const invoiceDialog = useOverlayState();
   const [isExporting, setIsExporting] = useState(false);
+  // What the invoice dialog reopens on. Its columns and categories are a preference and
+  // are worth remembering between invoices; the carry-over is not, and is cleared below.
+  const [invoiceOptions, setInvoiceOptions] = useState<InvoiceOptions>(defaultInvoiceOptions);
 
   const preset = parsePreset(searchParams.get('range'));
   const from = searchParams.get('from');
@@ -105,15 +112,13 @@ export function OrdersPanel({ restaurant }: { restaurant: RestaurantWithRelation
   // the new period's label.
   const isPending = rangeQuery.status === 'pending' || rangeQuery.isPlaceholderData;
 
-  const invoiceHref = restaurantInvoiceHref(restaurant.objectId, range);
-
   // The dishes behind the orders and the menu sections they sit in — paid for only once
-  // the export dialog is opened, since nothing else on this page needs them. Orders carry
-  // dish ids, never names or sections; see lib/services/foods.
+  // one of the two dialogs is opened, since nothing else on this page needs them. Orders
+  // carry dish ids, never names or sections; see lib/services/foods.
   const { query: catalogueQuery, categories } = useOrderCategories(
     restaurant.objectId,
     rangeQuery.data?.orders,
-    { enabled: exportDialog.isOpen },
+    { enabled: exportDialog.isOpen || invoiceDialog.isOpen },
   );
 
   const catalogue = catalogueQuery.data;
@@ -129,7 +134,11 @@ export function OrdersPanel({ restaurant }: { restaurant: RestaurantWithRelation
     [catalogue, rangeQuery.data, restaurant.fee, totals.ordersCount],
   );
 
-  const onExport = async (fields: ExportFieldKey[], categoryIds: string[]) => {
+  const onExport = async (
+    fields: ExportFieldKey[],
+    categoryIds: string[],
+    carryOver: CarryOver,
+  ) => {
     if (!rangeQuery.data) return;
     const { orders, truncated } = rangeQuery.data;
     setIsExporting(true);
@@ -160,11 +169,25 @@ export function OrdersPanel({ restaurant }: { restaurant: RestaurantWithRelation
         dishes,
         categoryLabel:
           categoryIds.length > 0 ? categoryLabel(categoryIds, menuNames, t) : undefined,
+        carryOver,
       });
       exportDialog.close();
     } finally {
       setIsExporting(false);
     }
+  };
+
+  // The document is a route, not a render: the dialog's choices go into the link and the
+  // invoice tab builds itself from them, exactly as it would from a link pasted by a
+  // colleague.
+  const onOpenInvoice = (options: InvoiceOptions) => {
+    setInvoiceOptions(options);
+    invoiceDialog.close();
+    window.open(
+      restaurantInvoiceHref(restaurant.objectId, range, options),
+      '_blank',
+      'noopener',
+    );
   };
 
   return (
@@ -188,7 +211,7 @@ export function OrdersPanel({ restaurant }: { restaurant: RestaurantWithRelation
           <Button
             variant="secondary"
             size="sm"
-            onPress={() => window.open(invoiceHref, '_blank', 'noopener')}
+            onPress={invoiceDialog.open}
             isDisabled={isPending || totals.ordersCount === 0}
           >
             <PrinterIcon className="size-4" />
@@ -287,7 +310,23 @@ export function OrdersPanel({ restaurant }: { restaurant: RestaurantWithRelation
         categoriesStatus={catalogueQuery.status}
         onRetryCategories={() => catalogueQuery.refetch()}
         countOrders={countOrders}
+        currency={currency}
         onExport={onExport}
+      />
+
+      <InvoiceOptionsModal
+        isOpen={invoiceDialog.isOpen}
+        onOpenChange={invoiceDialog.setOpen}
+        intent="open"
+        // Reopened with nothing carried over, like the export dialog: a balance is a
+        // figure about one moment in an account, and silently re-billing the last one
+        // typed would be worse than typing it again.
+        value={{ ...invoiceOptions, carryOver: NO_CARRY_OVER }}
+        categories={categories}
+        categoriesStatus={catalogueQuery.status}
+        onRetryCategories={() => catalogueQuery.refetch()}
+        currency={currency}
+        onConfirm={onOpenInvoice}
       />
     </div>
   );

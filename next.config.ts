@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
   // generateStaticParams, and the ids only exist in Parse) — which is why a restaurant
   // is addressed as /restaurants/detail?id=… rather than /restaurants/<id>.
   output: "export",
+  // `npm run dev:local` (local switch-server-v2, see switch-server-v2/docs/04-local-dev.md)
+  // compiles into its own folder, so code built against production is never served in
+  // local mode, or the reverse.
+  ...(process.env.SWITCH_LOCAL === "1" ? { distDir: ".next/local" } : {}),
 };
 
 export default nextConfig;

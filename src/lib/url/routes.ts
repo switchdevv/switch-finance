@@ -7,6 +7,8 @@
  * builders and the reader live together here so the two sides can't drift apart.
  */
 
+import { writeInvoiceOptions, type InvoiceOptions } from '@/lib/invoice/options';
+
 export const RESTAURANTS_HREF = '/restaurants';
 const DETAIL_PATH = '/restaurants/detail';
 const INVOICE_PATH = '/restaurants/invoice';
@@ -31,18 +33,12 @@ export function restaurantDetailHref(objectId: string, backHref?: string): strin
 export function restaurantInvoiceHref(
   objectId: string,
   range: { from: string; to: string },
+  /** What the print dialog chose. Omitted — from a link that just wants the document —
+   * the invoice prints the whole restaurant with its usual columns and nothing carried
+   * over. */
+  options?: InvoiceOptions,
 ): string {
   const params = new URLSearchParams({ id: objectId, from: range.from, to: range.to });
+  if (options) writeInvoiceOptions(params, options);
   return `${INVOICE_PATH}?${params.toString()}`;
-}
-
-/** The invoice's menu-section filter (lib/finance/categories.ts), comma-separated ids —
- * absent for the whole restaurant. The invoice page writes it from its own picker. */
-export const CATEGORIES_PARAM = 'categories';
-
-/** The categories an invoice link is narrowed to, deduplicated; empty for the whole
- * restaurant. */
-export function readCategoryIds(params: ReadableParams): string[] {
-  const raw = params.get(CATEGORIES_PARAM) ?? '';
-  return [...new Set(raw.split(',').map((id) => id.trim()).filter(Boolean))];
 }

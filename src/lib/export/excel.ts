@@ -1,3 +1,4 @@
+import { hasCarryOver, totalDue, type CarryOver } from '@/lib/finance/carry-over';
 import type { DateRange } from '@/lib/finance/date-range';
 import type { OrderTotals } from '@/lib/finance/totals';
 import type { Formatters } from '@/lib/format';
@@ -51,6 +52,10 @@ export type ExportArgs = {
    * names them — absent for the whole restaurant. `orders` and `totals` must already be
    * the slice. */
   categoryLabel?: string;
+  /** Owed from before this period, typed by hand in the export dialog. It is not order
+   * money, so it never touches the column totals — it is a line of its own under the
+   * commission, and the sheet's final figure is the two added together. */
+  carryOver?: CarryOver;
 };
 
 /**
@@ -73,6 +78,7 @@ export async function exportOrdersWorkbook({
   fields,
   dishes,
   categoryLabel,
+  carryOver,
 }: ExportArgs): Promise<void> {
   const picked = new Set(fields);
   const columns = EXPORT_FIELDS.filter((field) => picked.has(field.key));
@@ -195,38 +201,83 @@ export async function exportOrdersWorkbook({
     if (field.kind === 'money') totalsRow.getCell(field.key).numFmt = money;
   }
 
-  // The only balance that exists: orders are paid to the restaurant as they're taken, so
-  // the commission is what it owes Switch, not a deduction from a payout.
-  const commissionLabel = t('sheet.commissionOwed');
+  // ---- what is owed ---------------------------------------------------------
+  // Orders are paid to the restaurant as they're taken, so the commission is what it owes
+  // Switch, not a deduction from a payout — and a carry-over typed into the export dialog
+  // is an older one of those, still unpaid, so the two simply add up.
+  //
   // Under the Commission column where it's on the sheet, then Net sales, otherwise under
-  // the rightmost money column, so the figure still lands where a reader's eye is already
+  // the rightmost money column, so the figures still land where a reader's eye is already
   // totalling.
   const commissionFieldColumn = columns.findIndex((field) => field.key === 'commission');
   const netColumn = columns.findIndex((field) => field.key === 'net');
-  const commissionColumn =
+  const balanceColumn =
     commissionFieldColumn >= 0
       ? commissionFieldColumn
       : netColumn >= 0
         ? netColumn
         : columns.findLastIndex((field) => field.kind === 'money');
 
-  if (commissionColumn > 0) {
-    const commissionRow = sheet.addRow(
-      columns.map((_, index) => {
-        if (index === 0) return commissionLabel;
-        return index === commissionColumn ? totals.commission : '';
+  /**
+   * One "label … amount" line under the totals. When there's no money column to hang the
+   * amount under (or it's the first column, where the label itself sits), the label
+   * carries the figure instead, rather than the sheet losing it.
+   */
+  const addBalanceRow = (label: string, valueLabel: string, amount: number) => {
+    if (balanceColumn > 0) {
+      const row = sheet.addRow(
+        columns.map((_, index) => {
+          if (index === 0) return label;
+          return index === balanceColumn ? amount : '';
+        }),
+      );
+      row.font = { bold: true };
+      row.getCell(balanceColumn + 1).numFmt = money;
+      return row;
+    }
+    const row = sheet.addRow([valueLabel]);
+    row.font = { bold: true };
+    return row;
+  };
+
+  const carried = hasCarryOver(carryOver);
+
+  addBalanceRow(
+    // Without a carry-over the commission is the last word on the sheet and says so.
+    // With one it becomes this period's share of a larger figure below it.
+    carried ? t('sheet.commissionPeriod') : t('sheet.commissionOwed'),
+    t(carried ? 'sheet.commissionPeriodValue' : 'sheet.commissionOwedValue', {
+      amount: format.money(totals.commission, currency),
+    }),
+    totals.commission,
+  );
+
+  if (carried) {
+    const note = carryOver?.note;
+    const previousLabel = note
+      ? t('sheet.previousBalanceNoted', { note })
+      : t('sheet.previousBalance');
+    addBalanceRow(
+      previousLabel,
+      t('sheet.labelledValue', {
+        label: previousLabel,
+        amount: format.money(carryOver?.amount ?? 0, currency),
       }),
+      carryOver?.amount ?? 0,
     );
-    commissionRow.font = { bold: true };
-    commissionRow.getCell(commissionColumn + 1).numFmt = money;
-  } else {
-    // No money column to hang it under (or it's the first column, where the label sits).
-    // The sentence carries the number itself rather than the sheet losing the one figure
-    // it exists to state.
-    const commissionRow = sheet.addRow([
-      t('sheet.commissionOwedValue', { amount: format.money(totals.commission, currency) }),
-    ]);
-    commissionRow.font = { bold: true };
+
+    const total = totalDue(totals.commission, carryOver);
+    const totalDueRow = addBalanceRow(
+      t('sheet.totalDue'),
+      t('sheet.labelledValue', {
+        label: t('sheet.totalDue'),
+        amount: format.money(total, currency),
+      }),
+      total,
+    );
+    totalDueRow.eachCell((cell) => {
+      cell.border = { top: { style: 'thin', color: { argb: BRAND } } };
+    });
   }
 
   if (orders.length > 0) {
