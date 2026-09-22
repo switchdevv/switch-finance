@@ -1,34 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# switch-finance
 
-## Getting Started
+The Switch finance dashboard: what each restaurant sold and owes Switch in commission, for any
+period and by menu category, with Excel exports and printable invoices. Admins can always sign
+in; other staff need an admin to give them finance access.
 
-First, run the development server:
+## Environments
+
+| | Local | Staging | Production |
+|---|---|---|---|
+| Dashboard | http://localhost:3000 | https://switchfood-staging-finance.web.app | https://switch-finance.web.app |
+| Server | switch-server-v2 on your machine | switch-server-v2 on staging | `api.switchfood.net` |
+| Data | test data | test data | **real orders and restaurants** |
+| How it gets there | `npm run dev:local` | merge into `stg` | `npm run deploy`, by hand |
+
+## Run it locally
+
+You need Node 24, Docker Desktop, and the `switch-server-v2` repository next to this one, set up
+once as its onboarding guide says (`docs/00-onboarding.md` there).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cd ../switch-server-v2
+pnpm dev:all --only finance    # local server + test data + this dashboard on :3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Sign in as `admin` or `ops`, password `switch-dev`. If the local server is already running,
+`npm run dev:local` here starts only the dashboard.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`npm run dev` (without `:local`) talks to the **production** server. Don't use it to try things
+out.
 
-## Learn More
+## Ship a change to staging
 
-To learn more about Next.js, take a look at the following resources:
+1. Start from an up-to-date `stg`:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   ```bash
+   git switch stg && git pull
+   git switch -c fix/short-description
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+2. Make the change and try it locally. Then run what CI runs:
 
-## Deploy on Vercel
+   ```bash
+   npm run lint
+   npm run build:staging    # type check, staging build, and no production address in it
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. Push and open a pull request into `stg`:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   ```bash
+   git push -u origin fix/short-description
+   gh pr create --base stg --fill
+   ```
+
+   CI checks the pull request: lint, type check, the staging build, a production-address check,
+   a dependency audit and a secret scan. Fix anything red and push again.
+
+4. Merge. Every merge into `stg` deploys to staging on its own in a few minutes
+   (`gh run watch`). Don't push straight to `stg`: that deploys without review.
+
+5. Test on https://switchfood-staging-finance.web.app with the staging accounts (ask the team
+   for the password).
+
+If the change needs a server change too, ship the server to staging first (switch-server-v2's
+own `stg`), then the dashboard.
+
+**Production** is still deployed by hand with `npm run deploy`. A pipeline from `main` will come
+later.
+
+## Good to know
+
+- Staging's one-time setup, rollback and troubleshooting: [docs/staging.md](docs/staging.md).
+- A new `NEXT_PUBLIC_*` setting needs its staging value in `.env.staging`, or the staging build
+  fails.
+- Totals are in Algiers time (a day runs from midnight to midnight in Algeria).
