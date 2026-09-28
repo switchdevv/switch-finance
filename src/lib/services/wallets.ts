@@ -1,9 +1,9 @@
 import { callFunction } from '@/lib/parse/mutate';
 import type {
   TopUpMethod,
+  WalletConfig,
   WalletDetail,
   WalletList,
-  WalletSettings,
   WalletWriteResult,
 } from '@/types/wallet';
 
@@ -89,11 +89,12 @@ export function voidEntry(input: { entryId: string; reason: string }): Promise<W
 }
 
 /**
- * Writes Config `driverWallet` through the admin-only `updateConfigs`, which merges key by
- * key — so only this key is sent, and no other Config value can be overwritten by it.
+ * Writes Config `driverWallet` — the global rules and every region's — through the admin-only
+ * `updateConfigs`, which merges key by key: no other Config value can be overwritten by it. The
+ * key itself is written whole, so of two admins saving at once, the last save stands.
  */
-export function saveWalletSettings(settings: WalletSettings): Promise<unknown> {
-  return callFunction('updateConfigs', { configs: { driverWallet: settings } });
+export function saveWalletConfig(config: WalletConfig): Promise<unknown> {
+  return callFunction('updateConfigs', { configs: { driverWallet: config } });
 }
 
 /** A fresh request id for one recording (see above). */

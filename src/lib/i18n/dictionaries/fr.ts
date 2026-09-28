@@ -437,17 +437,19 @@ export const fr: Dictionary = {
       offline: 'Hors ligne',
       deactivated: 'Désactivé',
     },
-    enforcedTitle: 'Les portefeuilles sont appliqués',
+    enforcedTitle: 'Les portefeuilles sont appliqués partout',
     enforcedBody:
-      'Un livreur a besoin d’au moins {min} pour se connecter, et il est prévenu dans l’application à {low}.',
+      'Un livreur a besoin d’au moins {min} pour se connecter, et il est prévenu dans l’application à {low}, sauf si sa région fixe ses propres valeurs.',
+    enforcedExceptTitle: 'Les portefeuilles sont appliqués partout sauf à {regions}',
     notEnforcedTitle: 'Les portefeuilles ne sont pas encore appliqués',
     notEnforcedBody:
-      'Les soldes sont tenus, mais aucun livreur n’est bloqué ni prévenu. Un admin l’active dans Réglages des portefeuilles, une fois le solde de chaque livreur actif saisi.',
+      'Les soldes sont tenus, mais aucun livreur n’est bloqué ni prévenu, dans aucune région. Un admin l’active dans Réglages des portefeuilles ; les régions pas encore prêtes peuvent être exclues.',
     tiles: {
       held: 'Prépayé détenu',
       heldHint: 'ce que rembourseraient les commandes restantes',
       low: 'Bientôt épuisés',
       lowHint: 'à {orders} ou moins',
+      lowHintRegions: 'au seuil d’alerte de leur région ou moins',
       empty: 'Épuisés',
       emptyHint: 'ne peuvent pas se connecter tant que c’est appliqué',
       none: 'Sans portefeuille',
@@ -466,6 +468,9 @@ export const fr: Dictionary = {
       'Enregistrez la première recharge de ce livreur pour ouvrir son portefeuille. Ses livraisons comptent à partir de là, ou de la date d’un solde repris.',
     firstTopUp: 'Enregistrer la première recharge',
     since: 'Portefeuille depuis le {date}',
+    rulesOn: 'Appliqué à {region} : {min} pour se connecter, alerte à {low}',
+    rulesOff: 'Non appliqué à {region}',
+    noRegion: 'sans région',
     closedOn: 'Clôturé le {date}',
     tiles: {
       left: 'Commandes restantes',
@@ -560,6 +565,16 @@ export const fr: Dictionary = {
       title: 'Réglages des portefeuilles',
       subtitle:
         'Les règles appliquées aux portefeuilles des livreurs. Elles s’appliquent aussitôt, sans mise à jour de l’application.',
+      global: 'Toutes les régions',
+      regions: 'Par région',
+      regionsHint:
+        'L’interrupteur ci-dessus est l’interrupteur général : coupé, aucune région n’est concernée. Activé, toutes le sont, sauf celles exclues. Laissez un nombre vide pour garder celui du dessus.',
+      regionOn: 'Appliqué · {min} pour se connecter · alerte à {low}',
+      regionOff: 'Non appliqué : l’interrupteur général est coupé',
+      regionLeftOut: 'Exclue : non appliqué',
+      regionEnforcement: 'Portefeuilles à {name}',
+      included: 'Incluse',
+      leftOut: 'Exclue',
       enforced: 'Appliquer les portefeuilles',
       enforcedHint:
         'Un livreur sans assez de commandes ne peut pas se connecter, et il est prévenu une fois quand il arrive au seuil.',
@@ -569,9 +584,9 @@ export const fr: Dictionary = {
         'Se connecter demande {min}. Les livreurs reçoivent une notification et un bandeau dans l’application à {low}.',
       invalid: 'Les deux doivent être des nombres entiers, et l’alerte ne peut pas précéder le minimum.',
       affected_one:
-        '{count} livreur est en ligne avec moins de {min}. Il garde cette session, puis ne pourra plus se connecter sans recharger.',
+        '{count} livreur est en ligne avec moins de commandes que sa région n’en demande. Il garde cette session, puis ne pourra plus se connecter sans recharger.',
       affected_other:
-        '{count} livreurs sont en ligne avec moins de {min}. Ils gardent cette session, puis ne pourront plus se connecter sans recharger.',
+        '{count} livreurs sont en ligne avec moins de commandes que leur région n’en demande. Ils gardent cette session, puis ne pourront plus se connecter sans recharger.',
       submit: 'Enregistrer',
     },
     ledger: {

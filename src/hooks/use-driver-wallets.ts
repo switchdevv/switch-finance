@@ -10,7 +10,7 @@ import {
   recordAdjustment,
   recordRefund,
   recordTopUp,
-  saveWalletSettings,
+  saveWalletConfig,
   voidEntry,
 } from '@/lib/services/wallets';
 
@@ -52,7 +52,7 @@ export const useTopUp = () => useWalletMutation(recordTopUp);
 export const useRefund = () => useWalletMutation(recordRefund);
 export const useAdjustment = () => useWalletMutation(recordAdjustment);
 export const useVoidEntry = () => useWalletMutation(voidEntry);
-export const useSaveWalletSettings = () => useWalletMutation(saveWalletSettings);
+export const useSaveWalletConfig = () => useWalletMutation(saveWalletConfig);
 
 /** The server's figure for a refund being prepared; re-asked as the count changes. */
 export function useRefundPreview(driverId: string, orders: number | undefined, enabled: boolean) {

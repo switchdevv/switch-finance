@@ -7,7 +7,7 @@ import { Alert, Button, Chip, Skeleton, Table } from '@heroui/react';
 import { useCities } from '@/hooks/use-cities';
 import { useDrivers } from '@/hooks/use-drivers';
 import { useDriverWallets } from '@/hooks/use-driver-wallets';
-import { driverWalletState } from '@/lib/finance/wallet';
+import { driverWalletState, enforcementOf } from '@/lib/finance/wallet';
 import { formatOrNone, initials } from '@/lib/format';
 import { useI18n } from '@/lib/i18n/provider';
 import { parseErrorKey, walletErrorKey } from '@/lib/parse/errors';
@@ -18,7 +18,7 @@ import {
 } from '@/lib/url/driver-filters';
 import { driverDetailHref } from '@/lib/url/routes';
 import type { Driver } from '@/types/driver';
-import type { WalletSettings, WalletSummary } from '@/types/wallet';
+import type { WalletConfig, WalletSummary } from '@/types/wallet';
 import { PaginationBar } from '@/components/ui/pagination-bar';
 import { StatTile } from '@/components/ui/stat-tile';
 import { DriverFilters } from '@/components/drivers/driver-filters';
@@ -124,7 +124,8 @@ export function DriversTable() {
       <WalletOverview
         drivers={driversQuery.data}
         wallets={wallets}
-        settings={walletsQuery.data?.settings}
+        config={walletsQuery.data?.config}
+        cityNames={cityNames}
         isPending={walletsQuery.status === 'pending' || driversQuery.status === 'pending'}
       />
 
@@ -266,12 +267,14 @@ export function DriversTable() {
 function WalletOverview({
   drivers,
   wallets,
-  settings,
+  config,
+  cityNames,
   isPending,
 }: {
   drivers: Driver[] | undefined;
   wallets: ReadonlyMap<string, WalletSummary> | null;
-  settings: WalletSettings | undefined;
+  config: WalletConfig | undefined;
+  cityNames: ReadonlyMap<string, string | undefined>;
   isPending: boolean;
 }) {
   const { t, tCount, format } = useI18n();
@@ -301,23 +304,7 @@ function WalletOverview({
 
   return (
     <div className="flex flex-col gap-4">
-      {settings && (
-        <Alert status={settings.enforced ? 'accent' : 'warning'}>
-          <Alert.Content>
-            <Alert.Title>
-              {settings.enforced ? t('drivers.enforcedTitle') : t('drivers.notEnforcedTitle')}
-            </Alert.Title>
-            <Alert.Description>
-              {settings.enforced
-                ? t('drivers.enforcedBody', {
-                    min: orders(settings.minOrders),
-                    low: orders(settings.lowOrders),
-                  })
-                : t('drivers.notEnforcedBody')}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-      )}
+      {config && <EnforcementNotice config={config} cityNames={cityNames} />}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
@@ -331,7 +318,13 @@ function WalletOverview({
           icon={WalletIcon}
           label={t('drivers.tiles.low')}
           value={format.number(figures.low)}
-          hint={settings ? t('drivers.tiles.lowHint', { orders: orders(settings.lowOrders) }) : undefined}
+          hint={
+            !config
+              ? undefined
+              : Object.values(config.regions).some((region) => region.lowOrders !== undefined)
+                ? t('drivers.tiles.lowHintRegions')
+                : t('drivers.tiles.lowHint', { orders: orders(config.lowOrders) })
+          }
           isPending={isPending}
         />
         <StatTile
@@ -350,6 +343,54 @@ function WalletOverview({
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * Where wallets are enforced, in one line: everywhere, nowhere, only in some regions, or
+ * everywhere but some — the one setting that changes what a driver can do.
+ */
+function EnforcementNotice({
+  config,
+  cityNames,
+}: {
+  config: WalletConfig;
+  cityNames: ReadonlyMap<string, string | undefined>;
+}) {
+  const { t, tCount, format } = useI18n();
+  const enforcement = enforcementOf(config);
+  const orders = (count: number) => tCount('wallet.orders', count, { count: format.number(count) });
+  const names =
+    enforcement.kind === 'except'
+      ? enforcement.cityIds.map((id) => cityNames.get(id) ?? id).join(', ')
+      : '';
+  const rules = t('drivers.enforcedBody', {
+    min: orders(config.minOrders),
+    low: orders(config.lowOrders),
+  });
+
+  const copy = {
+    everywhere: { status: 'accent', title: t('drivers.enforcedTitle'), body: rules },
+    nowhere: {
+      status: 'warning',
+      title: t('drivers.notEnforcedTitle'),
+      body: t('drivers.notEnforcedBody'),
+    },
+    except: {
+      status: 'accent',
+      title: t('drivers.enforcedExceptTitle', { regions: names }),
+      body: rules,
+    },
+  } as const;
+  const { status, title, body } = copy[enforcement.kind];
+
+  return (
+    <Alert status={status}>
+      <Alert.Content>
+        <Alert.Title>{title}</Alert.Title>
+        <Alert.Description>{body}</Alert.Description>
+      </Alert.Content>
+    </Alert>
   );
 }
 

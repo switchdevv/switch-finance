@@ -15,7 +15,7 @@ import { useI18n } from '@/lib/i18n/provider';
 import { parseErrorKey, walletErrorKey } from '@/lib/parse/errors';
 import { DRIVERS_HREF, readDriverId } from '@/lib/url/routes';
 import type { Driver } from '@/types/driver';
-import type { LedgerEntryLine, WalletDetail } from '@/types/wallet';
+import type { LedgerEntryLine, WalletDetail, WalletSettings } from '@/types/wallet';
 import { DateRangeToolbar } from '@/components/ui/date-range-toolbar';
 import { StatTile } from '@/components/ui/stat-tile';
 import { AccountChip } from '@/components/drivers/drivers-table';
@@ -432,6 +432,10 @@ function Hero({
             )}
           </div>
 
+          {/* The rules this driver is held to: their region's where it sets any, else the
+              global ones — worked out by the server, so this says what it enforces. */}
+          {detail && <RulesLine settings={detail.settings} region={cityName} />}
+
           <div className="flex flex-col gap-1.5">
             <span className="text-body text-muted flex items-start gap-2">
               <MapPinIcon className="mt-0.5 size-4 shrink-0" />
@@ -463,6 +467,24 @@ function Hero({
         </div>
       </div>
     </section>
+  );
+}
+
+function RulesLine({ settings, region }: { settings: WalletSettings; region: string | undefined }) {
+  const { t, tCount, format } = useI18n();
+  const orders = (count: number) => tCount('wallet.orders', count, { count: format.number(count) });
+  const name = region ?? t('driver.noRegion');
+  return (
+    <span className="text-caption text-muted flex items-center gap-2">
+      <SlidersIcon className="size-3.5 shrink-0" />
+      {settings.enforced
+        ? t('driver.rulesOn', {
+            region: name,
+            min: orders(settings.minOrders),
+            low: orders(settings.lowOrders),
+          })
+        : t('driver.rulesOff', { region: name })}
+    </span>
   );
 }
 

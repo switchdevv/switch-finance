@@ -1,5 +1,5 @@
 import type { Driver } from '@/types/driver';
-import type { WalletSettings, WalletSummary } from '@/types/wallet';
+import type { WalletConfig, WalletSettings, WalletSummary } from '@/types/wallet';
 
 /**
  * How the Drivers page reads a wallet. The figures themselves are the server's
@@ -29,17 +29,50 @@ export function driverWalletState(wallet: WalletSummary | undefined): DriverWall
 export const UNITS_PER_ORDER = 100;
 
 /**
- * Drivers online right now whom the gate would refuse — what turning enforcement on, or
- * raising the minimum, would take offline at their next delivery. The server only checks
- * when a driver goes online, so these keep their current session.
+ * The rules for a driver in `cityId`: enforced only while the global switch is on and their
+ * region isn't left out; thresholds from their region where it sets one, else the global ones. The server's `walletSettingsFor` (switch-server-v2 src/domain/driver-wallet.ts)
+ * is what enforces them; this copy only lets the settings dialog preview a draft.
+ */
+export function walletSettingsFor(config: WalletConfig, cityId: string | null | undefined): WalletSettings {
+  const region = (cityId && config.regions[cityId]) || {};
+  return {
+    enforced: config.enforced && region.enforced !== false,
+    minOrders: region.minOrders ?? config.minOrders,
+    lowOrders: region.lowOrders ?? config.lowOrders,
+  };
+}
+
+/**
+ * Where wallets are enforced. The global switch is a master switch: off is nowhere, whatever a
+ * region says; on is everywhere but the regions left out (named by id).
+ */
+export type Enforcement =
+  | { kind: 'everywhere' }
+  | { kind: 'nowhere' }
+  | { kind: 'except'; cityIds: string[] };
+
+export function enforcementOf(config: WalletConfig): Enforcement {
+  if (!config.enforced) return { kind: 'nowhere' };
+  const leftOut = Object.entries(config.regions)
+    .filter(([, region]) => region.enforced === false)
+    .map(([cityId]) => cityId);
+  return leftOut.length ? { kind: 'except', cityIds: leftOut } : { kind: 'everywhere' };
+}
+
+/**
+ * Drivers online right now whom the gate would refuse under `config` — what turning
+ * enforcement on, or raising a minimum, would take offline at their next delivery. The server
+ * only checks when a driver goes online, so these keep their current session.
  */
 export function onlineWithoutEnough(
   drivers: readonly Driver[],
   wallets: ReadonlyMap<string, WalletSummary>,
-  settings: Pick<WalletSettings, 'minOrders'>,
+  config: WalletConfig,
 ): Driver[] {
   return drivers.filter((driver) => {
     if (driver.driverActive !== true || driver.enabled === false) return false;
+    const settings = walletSettingsFor(config, driver.city?.objectId);
+    if (!settings.enforced) return false;
     const units = wallets.get(driver.objectId)?.units ?? 0;
     return units < settings.minOrders * UNITS_PER_ORDER;
   });

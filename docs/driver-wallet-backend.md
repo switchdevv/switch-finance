@@ -58,24 +58,45 @@ Indexes: balances read `Order` by driver and date, served by `{ _p_driver: 1, _c
 Atlas before enforcing.** `driverWalletEntries` stays small; `{ driverId: 1, at: -1 }` is worth
 adding once it grows.
 
-## 2. Settings
+## 2. Settings — global, and by region
 
 Parse Config `driverWallet`:
 
+```json
+{
+  "enforced": false, "minOrders": 1, "lowOrders": 10,
+  "regions": { "<City objectId>": { "enforced": false, "lowOrders": 5 } }
+}
+```
+
 | Key | Default | Meaning |
 |---|---|---|
-| `enforced` | `false` | Off: balances are kept, nobody is refused, no alert is pushed (a top-up receipt still is). |
+| `enforced` | `false` | The **master switch**. Off: nothing is enforced in any region; balances are kept, nobody is refused, no alert is pushed (a top-up receipt still is). On: every region is enforced, except those left out. |
 | `minOrders` | `1` | Going online needs at least this many orders. |
 | `lowOrders` | `10` | At or under this many, the driver is warned once. |
+| `regions.<cityId>` | none | Only the values that region sets itself: `enforced: false` leaves it out; `minOrders` / `lowOrders` replace the global ones. |
 
-Admins set it from the Drivers page (Wallet settings), through the existing admin-only
-`updateConfigs`, which merges key by key.
+A driver (`_User.city`) is enforced only while the master switch is on and their region isn't
+left out; their thresholds are their region's where it sets them, else the global ones. A
+driver with no region follows the global rules. A region can't be enforced while the master
+switch is off: to start with one city, turn the switch on and leave the others out. The server reads the driver's current region on every check
+(`walletSettingsFor`, switch-server-v2 `src/domain/driver-wallet.ts`); this app keeps a copy of
+the rule only to preview a draft (`src/lib/finance/wallet.ts`).
+
+Admins set it from the Drivers page (Wallet settings): the global switch and thresholds, then
+one row per region with **Included / Left out** and its own thresholds (empty = the global
+one). It is saved through the existing admin-only `updateConfigs`, which merges Config key by
+key. The `driverWallet` key itself is written whole, so of two admins saving at the same moment,
+the last save stands.
+
+`listDriverWallets` answers the whole `config` and, per wallet, whether it is `enforced` for
+that driver; `getDriverWallet` answers the `settings` that driver is held to.
 
 ## 3. The online gate — `beforeSave _User`
 
 A non-master save that turns `driverActive` on (on an update: whenever it is written as
-`true`), while `driverWallet.enforced`, is refused when the driver holds fewer than `minOrders`
-orders:
+`true`), while the wallet is enforced for the driver's region, is refused when the driver holds
+fewer than that region's `minOrders` orders:
 
 ```
 142  WALLET_EMPTY
@@ -107,9 +128,10 @@ The client maps them in `walletErrorKey` (`src/lib/parse/errors.ts`).
 
 | Function | Who | Params | Returns |
 |---|---|---|---|
-| `getMyWallet` | the driver app | — | `{ enforced, state: 'off'\|'ok'\|'low'\|'empty', ordersLeft, canGoOnline, minOrders, lowOrders }` — no money |
-| `listDriverWallets` | finance | — | `{ settings, wallets: WalletSummary[] }` |
-| `getDriverWallet` | finance | `driverId, from?, to?` (ISO, ≤400 days; last 30 by default) | `{ settings, pricing: { unitPriceToday, currency }, ledger: null \| { summary, range, lines, truncated } }` |
+| `getMyWallet` | the driver app | — | `{ enforced, state: 'off'\|'ok'\|'low'\|'empty', ordersLeft, canGoOnline, minOrders, lowOrders, hasWallet }` for the driver's region — no money |
+| `getMyWalletHistory` | the driver app | `before?, limit?` (1–100, default 30) | `{ hasWallet, lines, next, recent }`: the driver's own movements newest first, in orders (`units`, `balanceAfter`), paged by a line's `cursor` — no price, amount, reference, staff name or note |
+| `listDriverWallets` | finance | — | `{ config, wallets: WalletSummary[] }` (§2) |
+| `getDriverWallet` | finance | `driverId, from?, to?` (ISO, ≤400 days; last 30 by default) | `{ settings (this driver's region), pricing: { unitPriceToday, currency }, ledger: null \| { summary, range, lines, truncated } }` |
 | `recordWalletTopUp` | finance | `driverId, orders, method: 'cash'\|'transfer'\|'carriedOver', requestId, reference?, note?, startsAt?` | `{ entry, summary }` |
 | `recordWalletRefund` | finance | `driverId, requestId, orders?` (default all), `close?` (full refund only), `note?`, `dryRun?` | `{ entry, summary }`, or with `dryRun` `{ preview: { units, amount } }` |
 | `recordWalletAdjustment` | admin | `driverId, requestId, orders` (±), `reason, unitPrice?` (adds only; default today's fee, 0 = no cash value) | `{ entry, summary }` |
@@ -155,5 +177,4 @@ Pushes carry `data: { wallet: 'refresh', icon }` with an icon every driver build
    start date of the balance kept by hand.
 5. The driver app release with the wallet (orders left, banner, refusal popup). Wait for
    drivers to update.
-6. An admin turns on **Enforce wallets**. The settings dialog first lists the drivers online
-   without enough orders.
+6. An admin turns on the master switch, leaving out the regions not ready yet. The settings dialog first counts the drivers online without enough orders.

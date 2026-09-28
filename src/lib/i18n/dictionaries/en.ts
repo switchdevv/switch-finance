@@ -444,17 +444,19 @@ export const en = {
       offline: 'Offline',
       deactivated: 'Deactivated',
     },
-    enforcedTitle: 'Wallets are enforced',
+    enforcedTitle: 'Wallets are enforced everywhere',
     enforcedBody:
-      'A driver needs at least {min} to go online, and is warned in the app at {low}.',
+      'A driver needs at least {min} to go online, and is warned in the app at {low}, unless their region sets its own.',
+    enforcedExceptTitle: 'Wallets are enforced everywhere except {regions}',
     notEnforcedTitle: 'Wallets are not enforced yet',
     notEnforcedBody:
-      'Balances are kept, but no driver is refused or warned. An admin turns this on in Wallet settings, once every active driver has their balance.',
+      'Balances are kept, but no driver is refused or warned, in any region. An admin turns this on in Wallet settings; regions not ready yet can be left out.',
     tiles: {
       held: 'Prepaid held',
       heldHint: 'what the orders left would refund',
       low: 'Running low',
       lowHint: 'at {orders} or fewer',
+      lowHintRegions: 'at or under their region’s warning level',
       empty: 'Out of orders',
       emptyHint: "can't go online while enforced",
       none: 'No wallet',
@@ -473,6 +475,9 @@ export const en = {
       'Record this driver’s first top-up to open their wallet. Their deliveries count from then on, or from the date you carry a balance over from.',
     firstTopUp: 'Record first top-up',
     since: 'Wallet since {date}',
+    rulesOn: 'Enforced in {region}: {min} to go online, warned at {low}',
+    rulesOff: 'Not enforced in {region}',
+    noRegion: 'no region',
     closedOn: 'Closed on {date}',
     tiles: {
       left: 'Orders left',
@@ -566,6 +571,16 @@ export const en = {
       open: 'Wallet settings',
       title: 'Wallet settings',
       subtitle: 'The rules drivers’ wallets are held to. They apply at once, with no app update.',
+      global: 'All regions',
+      regions: 'By region',
+      regionsHint:
+        'The switch above is the master switch: off, no region is enforced. On, every region is, except those left out. Leave a number empty to keep the one above.',
+      regionOn: 'Enforced · {min} to go online · warned at {low}',
+      regionOff: 'Not enforced: the master switch is off',
+      regionLeftOut: 'Left out: not enforced',
+      regionEnforcement: 'Wallets in {name}',
+      included: 'Included',
+      leftOut: 'Left out',
       enforced: 'Enforce wallets',
       enforcedHint:
         'Drivers without enough orders can’t go online, and are warned once when they run low.',
@@ -574,9 +589,9 @@ export const en = {
       summary: 'Going online needs {min}. Drivers get a push and an in-app banner at {low}.',
       invalid: 'Both must be whole numbers, and the warning can’t come before the minimum.',
       affected_one:
-        '{count} driver is online now with fewer than {min}. They keep this session, then can’t go online again until they top up.',
+        '{count} driver is online now with fewer orders than their region needs. They keep this session, then can’t go online again until they top up.',
       affected_other:
-        '{count} drivers are online now with fewer than {min}. They keep this session, then can’t go online again until they top up.',
+        '{count} drivers are online now with fewer orders than their region needs. They keep this session, then can’t go online again until they top up.',
       submit: 'Save',
     },
     ledger: {

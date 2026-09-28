@@ -10,7 +10,7 @@ import type { CurrencyCode } from './city';
  * bought at. Amounts are DA (the driver's city currency); dates are ISO strings.
  */
 
-/** Parse Config `driverWallet`, set by admins from the Drivers page. */
+/** The rules one driver's wallet is held to: global, or their region's where it sets any. */
 export type WalletSettings = {
   /** Off: nothing is refused and no alert is pushed; balances are still kept. */
   enforced: boolean;
@@ -18,6 +18,17 @@ export type WalletSettings = {
   minOrders: number;
   /** At or under this many orders the driver is warned. */
   lowOrders: number;
+};
+
+/** A region's own values; a missing key follows the global one. */
+export type RegionWalletSettings = Partial<WalletSettings>;
+
+/**
+ * Parse Config `driverWallet`, set by admins from the Drivers page: the global rules, and per
+ * region (`City` objectId) only the values that region sets itself.
+ */
+export type WalletConfig = WalletSettings & {
+  regions: Record<string, RegionWalletSettings>;
 };
 
 export type WalletLevel = 'ok' | 'low' | 'empty';
@@ -37,6 +48,8 @@ export type WalletSummary = {
   unitPriceToday: number | null;
   currency: CurrencyCode | null;
   level: WalletLevel;
+  /** Whether the rules for this driver's region hold them to the wallet right now. */
+  enforced: boolean;
   lastTopUp: { at: string; orders: number; amount: number } | null;
 };
 
@@ -106,9 +119,10 @@ export type WalletLedger = {
   truncated: boolean;
 };
 
-export type WalletList = { settings: WalletSettings; wallets: WalletSummary[] };
+export type WalletList = { config: WalletConfig; wallets: WalletSummary[] };
 
 export type WalletDetail = {
+  /** The rules this driver is held to (their region's, else global). */
   settings: WalletSettings;
   /** What a top-up would cost today — known whether or not the driver has a wallet. */
   pricing: { unitPriceToday: number | null; currency: CurrencyCode | null };
