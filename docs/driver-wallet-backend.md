@@ -83,11 +83,14 @@ switch is off: to start with one city, turn the switch on and leave the others o
 (`walletSettingsFor`, switch-server-v2 `src/domain/driver-wallet.ts`); this app keeps a copy of
 the rule only to preview a draft (`src/lib/finance/wallet.ts`).
 
-Admins set it from the Drivers page (Wallet settings): the global switch and thresholds, then
-one row per region with **Included / Left out** and its own thresholds (empty = the global
-one). It is saved through the existing admin-only `updateConfigs`, which merges Config key by
-key. The `driverWallet` key itself is written whole, so of two admins saving at the same moment,
-the last save stands.
+Admins set it on the Wallet settings page (`/drivers/settings`, linked from the Drivers page):
+the global switch and thresholds, then one row per region with **Included / Left out** and its
+own thresholds (empty = the global one). Regions are searched, filtered, paged and edited in
+bulk, and saved once from the bar at the foot of the page. It is saved through the existing
+admin-only `updateConfigs`, which merges Config key by key. The `driverWallet` key itself is
+written whole, so the page re-reads it just before saving and lays only its own changes (each
+global value, each region) over what is there (`mergeWalletConfig`): two admins editing
+different regions keep both edits; on the same value, the last save stands.
 
 `listDriverWallets` answers the whole `config` and, per wallet, whether it is `enforced` for
 that driver; `getDriverWallet` answers the `settings` that driver is held to.
@@ -129,7 +132,7 @@ The client maps them in `walletErrorKey` (`src/lib/parse/errors.ts`).
 | Function | Who | Params | Returns |
 |---|---|---|---|
 | `getMyWallet` | the driver app | — | `{ enforced, state: 'off'\|'ok'\|'low'\|'empty', ordersLeft, canGoOnline, minOrders, lowOrders, hasWallet }` for the driver's region — no money |
-| `getMyWalletHistory` | the driver app | `before?, limit?` (1–100, default 30) | `{ hasWallet, lines, next, recent }`: the driver's own movements newest first, in orders (`units`, `balanceAfter`), paged by a line's `cursor` — no price, amount, reference, staff name or note |
+| `getMyWalletHistory` | the driver app | `before?, limit?` (1–100, default 30) | `{ hasWallet, lines, next }`: the driver's own movements newest first, in orders (`units`, `balanceAfter`), paged by a line's `cursor` — no price, amount, reference, staff name or note |
 | `listDriverWallets` | finance | — | `{ config, wallets: WalletSummary[] }` (§2) |
 | `getDriverWallet` | finance | `driverId, from?, to?` (ISO, ≤400 days; last 30 by default) | `{ settings (this driver's region), pricing: { unitPriceToday, currency }, ledger: null \| { summary, range, lines, truncated } }` |
 | `recordWalletTopUp` | finance | `driverId, orders, method: 'cash'\|'transfer'\|'carriedOver', requestId, reference?, note?, startsAt?` | `{ entry, summary }` |

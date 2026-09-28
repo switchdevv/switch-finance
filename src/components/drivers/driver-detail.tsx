@@ -13,11 +13,19 @@ import { driverWalletState } from '@/lib/finance/wallet';
 import { formatOrNone, initials, splitPhones } from '@/lib/format';
 import { useI18n } from '@/lib/i18n/provider';
 import { parseErrorKey, walletErrorKey } from '@/lib/parse/errors';
-import { DRIVERS_HREF, readDriverId } from '@/lib/url/routes';
+import {
+  DRIVER_TABS,
+  DRIVERS_HREF,
+  readDriverId,
+  readDriverTab,
+  type DriverTab,
+} from '@/lib/url/routes';
 import type { Driver } from '@/types/driver';
 import type { LedgerEntryLine, WalletDetail, WalletSettings } from '@/types/wallet';
 import { DateRangeToolbar } from '@/components/ui/date-range-toolbar';
+import { PageTabs } from '@/components/ui/page-tabs';
 import { StatTile } from '@/components/ui/stat-tile';
+import { DriverFinance, type FinanceScope } from '@/components/drivers/driver-finance';
 import { AccountChip } from '@/components/drivers/drivers-table';
 import {
   AdjustDialog,
@@ -31,6 +39,7 @@ import { WalletStateChip } from '@/components/drivers/wallet-state-chip';
 import {
   ArrowLeftIcon,
   BikeIcon,
+  ChartIcon,
   MapPinIcon,
   PhoneIcon,
   PlusIcon,
@@ -42,9 +51,11 @@ import {
 } from '@/components/icons';
 
 /**
- * One driver's prepaid wallet: what is left and what it is worth, the ways money comes in
- * and goes back out, and the ledger of every movement over a period. The period lives in the
- * URL (`?range=&from=&to=`), like a restaurant's report, and defaults to this month.
+ * One driver, in two tabs under one header: **Finance** — what they delivered, earned,
+ * collected and owe over a period, with the spreadsheet and the printed statement — and
+ * **Wallet** — their prepaid orders and the ledger of every movement. The tab is `?tab=`
+ * (Finance when absent); the period (`?range=&from=&to=`, this month by default) is shared by
+ * both, so switching tabs keeps the dates.
  */
 export function DriverDetail() {
   const { t } = useI18n();
@@ -54,6 +65,9 @@ export function DriverDetail() {
   const driverId = readDriverId(searchParams);
   const backHref = safeBackHref(searchParams.get('back'));
   const { role } = useAccess();
+  const tab = readDriverTab(searchParams);
+  const scope: FinanceScope = searchParams.get('fscope') === 'all' ? 'all' : 'delivered';
+  const financePage = Math.max(1, Math.trunc(Number(searchParams.get('fpage'))) || 1);
 
   const rawPreset = searchParams.get('range');
   const preset: RangePreset = rawPreset ? parsePreset(rawPreset) : 'month';
@@ -62,7 +76,10 @@ export function DriverDetail() {
   const range = useMemo(() => resolveRange(preset, from, to), [preset, from, to]);
 
   const driverQuery = useDriver(driverId);
+  // Read on both tabs: the header shows the wallet's state, and Finance needs the day it
+  // started counting to say which deliveries it already settled.
   const walletQuery = useDriverWallet(driverId, range);
+  const cities = useCities();
 
   const setParams = useCallback(
     (next: Record<string, string | undefined>) => {
@@ -108,34 +125,87 @@ export function DriverDetail() {
 
   if (!driverQuery.data) return <NotFound backHref={backHref} />;
 
+  const driver = driverQuery.data;
+  const city = cities.data?.find((entry) => entry.objectId === driver.city?.objectId);
+  const detail = walletQuery.data;
+
+  // Any change of period sends the Finance table back to its first page.
+  const onPresetChange = (next: RangePreset) =>
+    setParams({
+      range: next,
+      fpage: undefined,
+      ...(next === 'custom'
+        ? { from: range.from, to: range.to }
+        : { from: undefined, to: undefined }),
+    });
+  const onCustomChange = (nextFrom: string, nextTo: string) =>
+    setParams({ range: 'custom', from: nextFrom, to: nextTo, fpage: undefined });
+
+  const tabHref = (next: DriverTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === 'finance') params.delete('tab');
+    else params.set('tab', next);
+    return `${pathname}?${params.toString()}`;
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <BackLink href={backHref} />
-      <WalletPage
-        driver={driverQuery.data}
-        wallet={walletQuery}
-        isAdmin={role === 'admin'}
-        range={range}
-        onPresetChange={(next) =>
-          setParams({
-            range: next,
-            ...(next === 'custom'
-              ? { from: range.from, to: range.to }
-              : { from: undefined, to: undefined }),
-          })
-        }
-        onCustomChange={(nextFrom, nextTo) =>
-          setParams({ range: 'custom', from: nextFrom, to: nextTo })
-        }
+      <Hero
+        driver={driver}
+        cityName={city?.name}
+        detail={detail}
+        isPending={walletQuery.status === 'pending'}
       />
+
+      <PageTabs
+        label={t('driver.tabs.label')}
+        value={tab}
+        tabs={DRIVER_TABS.map((key) => ({
+          key,
+          label: t(`driver.tabs.${key}`),
+          href: tabHref(key),
+          icon: key === 'finance' ? ChartIcon : WalletIcon,
+        }))}
+      />
+
+      {tab === 'finance' ? (
+        <DriverFinance
+          driverId={driver.objectId}
+          driverName={formatOrNone(driver.fullname ?? driver.username)}
+          currency={city?.currency}
+          range={range}
+          walletStartsAt={detail?.ledger?.summary.startsAt ?? null}
+          scope={scope}
+          page={financePage}
+          onPresetChange={onPresetChange}
+          onCustomChange={onCustomChange}
+          onScopeChange={(next) =>
+            setParams({ fscope: next === 'delivered' ? undefined : next, fpage: undefined })
+          }
+          onPageChange={(next) => setParams({ fpage: next > 1 ? String(next) : undefined })}
+        />
+      ) : (
+        <WalletPage
+          driver={driver}
+          cityName={city?.name}
+          wallet={walletQuery}
+          isAdmin={role === 'admin'}
+          range={range}
+          onPresetChange={onPresetChange}
+          onCustomChange={onCustomChange}
+        />
+      )}
     </div>
   );
 }
 
 type WalletQuery = ReturnType<typeof useDriverWallet>;
 
+/** The Wallet tab: the actions that move money, the four figures, and the ledger. */
 function WalletPage({
   driver,
+  cityName,
   wallet,
   isAdmin,
   range,
@@ -143,6 +213,7 @@ function WalletPage({
   onCustomChange,
 }: {
   driver: Driver;
+  cityName: string | undefined;
   wallet: WalletQuery;
   isAdmin: boolean;
   range: ReturnType<typeof resolveRange>;
@@ -150,7 +221,6 @@ function WalletPage({
   onCustomChange: (from: string, to: string) => void;
 }) {
   const { t, tCount, format } = useI18n();
-  const cities = useCities();
   const drivers = useDrivers();
   const topUpDialog = useOverlayState();
   const refundDialog = useOverlayState();
@@ -158,7 +228,6 @@ function WalletPage({
   const voidDialog = useOverlayState();
   const [voiding, setVoiding] = useState<LedgerEntryLine | null>(null);
 
-  const cityName = cities.data?.find((city) => city.objectId === driver.city?.objectId)?.name;
   const ref: DriverRef = {
     id: driver.objectId,
     name: formatOrNone(driver.fullname ?? driver.username),
@@ -181,34 +250,33 @@ function WalletPage({
 
   return (
     <>
-      <Hero
-        driver={driver}
-        cityName={cityName}
-        detail={detail}
-        isPending={isPending}
-        actions={
-          detail && (
-            <>
-              <Button variant="primary" size="sm" onPress={topUpDialog.open}>
-                <PlusIcon className="size-4" />
-                {t('wallet.actions.topUp')}
+      <section className="border-border/70 bg-surface rounded-card shadow-card flex flex-wrap items-center justify-between gap-4 border px-5 py-4">
+        <DateRangeToolbar
+          range={range}
+          onPresetChange={onPresetChange}
+          onCustomChange={onCustomChange}
+        />
+        {detail && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="primary" size="sm" onPress={topUpDialog.open}>
+              <PlusIcon className="size-4" />
+              {t('wallet.actions.topUp')}
+            </Button>
+            {summary && (
+              <Button variant="secondary" size="sm" onPress={refundDialog.open}>
+                <RefundIcon className="size-4" />
+                {t('wallet.actions.refund')}
               </Button>
-              {summary && (
-                <Button variant="secondary" size="sm" onPress={refundDialog.open}>
-                  <RefundIcon className="size-4" />
-                  {t('wallet.actions.refund')}
-                </Button>
-              )}
-              {summary && isAdmin && (
-                <Button variant="secondary" size="sm" onPress={adjustDialog.open}>
-                  <SlidersIcon className="size-4" />
-                  {t('wallet.actions.adjust')}
-                </Button>
-              )}
-            </>
-          )
-        }
-      />
+            )}
+            {summary && isAdmin && (
+              <Button variant="secondary" size="sm" onPress={adjustDialog.open}>
+                <SlidersIcon className="size-4" />
+                {t('wallet.actions.adjust')}
+              </Button>
+            )}
+          </div>
+        )}
+      </section>
 
       {wallet.status === 'error' && (
         <Alert status="danger">
@@ -296,11 +364,7 @@ function WalletPage({
           <section className="border-border/70 bg-surface rounded-card shadow-card overflow-hidden border">
             <header className="border-separator/70 flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
               <h2 className="text-h6 font-bold">{t('wallet.ledger.title')}</h2>
-              <DateRangeToolbar
-                range={range}
-                onPresetChange={onPresetChange}
-                onCustomChange={onCustomChange}
-              />
+              <span className="text-caption text-muted">{format.range(range)}</span>
             </header>
             {ledger ? (
               <WalletLedgerTable
@@ -369,13 +433,11 @@ function Hero({
   cityName,
   detail,
   isPending,
-  actions,
 }: {
   driver: Driver;
   cityName: string | undefined;
   detail: WalletDetail | undefined;
   isPending: boolean;
-  actions: React.ReactNode;
 }) {
   const { t, format } = useI18n();
   const summary = detail?.ledger?.summary;
@@ -403,12 +465,9 @@ function Hero({
         )}
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <Typography.Heading level={1} className="text-h3 font-bold tracking-tight">
-              {formatOrNone(driver.fullname ?? driver.username)}
-            </Typography.Heading>
-            <div className="flex flex-wrap items-center gap-2">{actions}</div>
-          </div>
+          <Typography.Heading level={1} className="text-h3 font-bold tracking-tight">
+            {formatOrNone(driver.fullname ?? driver.username)}
+          </Typography.Heading>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             {isPending ? (

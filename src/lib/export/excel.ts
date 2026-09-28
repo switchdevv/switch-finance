@@ -7,23 +7,21 @@ import type { DishCatalogue } from '@/lib/services/foods';
 import type { CurrencyCode } from '@/types/city';
 import type { OrderWithUser } from '@/types/order';
 import {
+  BAND,
+  BRAND,
+  columnLetter,
+  downloadWorkbook,
+  HEADER_TEXT,
+  loadExcel,
+  moneyFormat,
+  slug,
+} from './workbook';
+import {
   EXPORT_FIELDS,
   type ExportField,
   type ExportFieldKey,
   type ExportRowContext,
 } from './fields';
-
-/** Symbols get baked into the cell number format so the figures stay real numbers the
- * recipient can sum, rather than strings with a currency glued on. */
-const CURRENCY_FORMATS: Record<CurrencyCode, string> = {
-  dzd: '#,##0" DA"',
-  usd: '"$"#,##0.00',
-  eur: '#,##0.00" €"',
-};
-
-const BRAND = 'FF00786B'; // the dashboard's --brand-600, in the ARGB Excel wants
-const HEADER_TEXT = 'FFFFFFFF';
-const BAND = 'FFF4F7F7';
 
 /** How far the title block spans when there are columns enough for it. */
 const TITLE_SPAN = 6;
@@ -61,9 +59,7 @@ export type ExportArgs = {
 /**
  * Builds and downloads the orders workbook for the selected range and columns.
  *
- * ExcelJS is imported lazily inside this function: it's around 900KB, only ever runs
- * behind a click, and pulling it into the initial bundle would slow every page in the
- * dashboard to speed up one button.
+ * ExcelJS is imported lazily inside this function — see loadExcel().
  */
 export async function exportOrdersWorkbook({
   t,
@@ -84,12 +80,9 @@ export async function exportOrdersWorkbook({
   const columns = EXPORT_FIELDS.filter((field) => picked.has(field.key));
   if (columns.length === 0) throw new Error(t('sheet.noColumns'));
 
-  const imported = await import('exceljs');
-  // The browser build is UMD, so depending on the bundler's interop the namespace either
-  // is the library or wraps it in `default`. Accept both rather than betting on one.
-  const ExcelJS = (imported as unknown as { default?: typeof imported }).default ?? imported;
+  const ExcelJS = await loadExcel();
 
-  const money = currency ? CURRENCY_FORMATS[currency] : '#,##0';
+  const money = moneyFormat(currency);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Switch Finance';
   workbook.created = new Date();
@@ -292,48 +285,8 @@ export async function exportOrdersWorkbook({
   const stem = categoryLabel
     ? `${restaurantStem}-${slug(categoryLabel, t('sheet.file.categories'))}`
     : restaurantStem;
-  download(
-    new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    }),
+  downloadWorkbook(
+    buffer,
     `${stem}-${t('sheet.file.orders')}-${range.from}-${t('sheet.file.to')}-${range.to}.xlsx`,
   );
-}
-
-/** 1-based column index to its spreadsheet letter (1 → A, 27 → AA). */
-function columnLetter(index: number): string {
-  let remaining = index;
-  let letters = '';
-  while (remaining > 0) {
-    const offset = (remaining - 1) % 26;
-    letters = String.fromCharCode(65 + offset) + letters;
-    remaining = (remaining - offset - 1) / 26;
-  }
-  return letters;
-}
-
-/** Latin-safe filename stem. Arabic restaurant names survive fine inside the sheet, but
- * in a filename they get mangled by whatever the recipient's OS does with them — so a
- * name with nothing Latin left in it becomes `fallback`. */
-function slug(name: string, fallback: string): string {
-  const cleaned = name
-    .normalize('NFKD')
-    .replace(/[^\w\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .toLowerCase();
-  return cleaned || fallback;
-}
-
-function download(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  // Revoked on the next tick, not immediately: Safari reads the href asynchronously
-  // after the click and hands back an empty file if the URL is already gone.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
 }

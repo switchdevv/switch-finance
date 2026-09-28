@@ -119,3 +119,29 @@ export function resolveRange(
 export function parsePreset(raw: string | null | undefined): RangePreset {
   return (RANGE_PRESETS as readonly string[]).includes(raw ?? '') ? (raw as RangePreset) : 'today';
 }
+
+/** Every calendar day of a range, oldest first, as YYYY-MM-DD. */
+export function daysIn(range: Pick<DateRange, 'from' | 'to'>): string[] {
+  const first = parseCalendarDate(range.from);
+  const last = parseCalendarDate(range.to);
+  if (!first || !last) return [];
+  const days: string[] = [];
+  // A year is the longest preset; the cap only stops a hand-edited link from looping.
+  for (let day = first; day.compare(last) <= 0 && days.length < 400; day = day.add({ days: 1 })) {
+    days.push(day.toString());
+  }
+  return days;
+}
+
+// 'en-CA' writes dates as YYYY-MM-DD, which is what the ranges and daysIn() speak.
+const businessDayFormat = new Intl.DateTimeFormat('en-CA', {
+  timeZone: BUSINESS_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** The Algiers calendar day an instant falls on, as YYYY-MM-DD. */
+export function businessDay(iso: string): string {
+  return businessDayFormat.format(new Date(iso));
+}

@@ -1,5 +1,5 @@
 /**
- * The two routes that address a single restaurant.
+ * The routes that address a single restaurant or driver.
  *
  * They carry the objectId as `?id=` rather than as a path segment because the app is
  * exported to static files (see next.config.ts): a `[objectId]` segment would have to be
@@ -7,6 +7,12 @@
  * builders and the reader live together here so the two sides can't drift apart.
  */
 
+import {
+  MODE_PARAM,
+  writeStatementOptions,
+  type StatementMode,
+  type StatementOptions,
+} from '@/lib/invoice/driver-statement';
 import { writeInvoiceOptions, type InvoiceOptions } from '@/lib/invoice/options';
 
 export const RESTAURANTS_HREF = '/restaurants';
@@ -45,6 +51,17 @@ export function restaurantInvoiceHref(
 
 export const DRIVERS_HREF = '/drivers';
 const DRIVER_DETAIL_PATH = '/drivers/detail';
+const DRIVER_STATEMENT_PATH = '/drivers/statement';
+/** Admin-only: the wallet rules, global and per region. */
+export const WALLET_SETTINGS_HREF = '/drivers/settings';
+
+/** The two halves of a driver's page. Finance is the default and stays out of the URL. */
+export type DriverTab = 'finance' | 'wallet';
+export const DRIVER_TABS: readonly DriverTab[] = ['finance', 'wallet'];
+
+export function readDriverTab(params: ReadableParams): DriverTab {
+  return params.get('tab') === 'wallet' ? 'wallet' : 'finance';
+}
 
 /** The driver the current URL is about, or '' when the link was malformed. */
 export function readDriverId(params: ReadableParams): string {
@@ -52,8 +69,22 @@ export function readDriverId(params: ReadableParams): string {
 }
 
 /** Like `restaurantDetailHref`: `backHref` is the drivers list exactly as it was left. */
-export function driverDetailHref(objectId: string, backHref?: string): string {
+export function driverDetailHref(objectId: string, backHref?: string, tab?: DriverTab): string {
   const params = new URLSearchParams({ id: objectId });
+  if (tab === 'wallet') params.set('tab', tab);
   if (backHref) params.set('back', backHref);
   return `${DRIVER_DETAIL_PATH}?${params.toString()}`;
+}
+
+/** A driver's printable statement for a period — see lib/invoice/driver-statement.ts. */
+export function driverStatementHref(
+  objectId: string,
+  range: { from: string; to: string },
+  mode: StatementMode,
+  options?: StatementOptions,
+): string {
+  const params = new URLSearchParams({ id: objectId, from: range.from, to: range.to });
+  if (mode !== 'settlement') params.set(MODE_PARAM, mode);
+  if (options) writeStatementOptions(params, options);
+  return `${DRIVER_STATEMENT_PATH}?${params.toString()}`;
 }

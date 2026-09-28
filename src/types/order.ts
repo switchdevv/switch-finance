@@ -77,3 +77,8 @@ export type Order = ParseObjectJSON & {
 export type OrderWithUser = Omit<Order, 'user'> & {
   user?: ParseObjectJSON & { fullname?: string; phone?: string };
 };
+
+/** An order with `restaurant` resolved by `include` — where a driver collected it. */
+export type DriverOrder = Omit<Order, 'restaurant'> & {
+  restaurant?: ParseObjectJSON & { name?: string };
+};

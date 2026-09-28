@@ -2,6 +2,7 @@
 
 import { Input, Label, NumberField, TextField } from '@heroui/react';
 import type { CarryOver } from '@/lib/finance/carry-over';
+import type { MessageKey } from '@/lib/i18n/dictionary';
 import { useI18n } from '@/lib/i18n/provider';
 import type { CurrencyCode } from '@/types/city';
 
@@ -17,10 +18,16 @@ export function CarryOverFields({
   value,
   currency,
   onChange,
+  hintKey = 'carryOver.hint',
+  includedKey = 'carryOver.included',
 }: {
   value: CarryOver;
   currency: CurrencyCode | undefined;
   onChange: (next: CarryOver) => void;
+  /** The line under the fields — a driver's statement words it for a driver. */
+  hintKey?: MessageKey;
+  /** Takes `{amount}`. */
+  includedKey?: MessageKey;
 }) {
   const { t, format } = useI18n();
 
@@ -59,8 +66,8 @@ export function CarryOverFields({
 
       <p className="text-caption text-muted">
         {value.amount > 0
-          ? t('carryOver.included', { amount: format.money(value.amount, currency) })
-          : t('carryOver.hint')}
+          ? t(includedKey, { amount: format.money(value.amount, currency) })
+          : t(hintKey)}
       </p>
     </div>
   );

@@ -85,7 +85,7 @@ function readColumns(params: ReadableParams): InvoiceColumnKey[] {
 
 /** The outstanding balance a link carries; nothing when it carries none, or when the
  * value in it isn't a positive amount. */
-function readCarryOver(params: ReadableParams): CarryOver {
+export function readCarryOver(params: ReadableParams): CarryOver {
   const amount = Number(params.get(CARRY_OVER_PARAM));
   if (!Number.isFinite(amount) || amount <= 0) return NO_CARRY_OVER;
   return {

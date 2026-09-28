@@ -1,5 +1,5 @@
 import type { Driver } from '@/types/driver';
-import type { WalletConfig, WalletSettings, WalletSummary } from '@/types/wallet';
+import type { RegionWalletSettings, WalletConfig, WalletSettings, WalletSummary } from '@/types/wallet';
 
 /**
  * How the Drivers page reads a wallet. The figures themselves are the server's
@@ -76,4 +76,50 @@ export function onlineWithoutEnough(
     const units = wallets.get(driver.objectId)?.units ?? 0;
     return units < settings.minOrders * UNITS_PER_ORDER;
   });
+}
+
+/** Whole, at least one, and the warning at or above the minimum. */
+export function isWalletSettingsValid(settings: WalletSettings): boolean {
+  return (
+    Number.isInteger(settings.minOrders) &&
+    settings.minOrders >= 1 &&
+    Number.isInteger(settings.lowOrders) &&
+    settings.lowOrders >= settings.minOrders
+  );
+}
+
+/** Two regions' own values are the same choice (a missing region sets nothing). */
+export function sameRegion(
+  a: RegionWalletSettings | undefined,
+  b: RegionWalletSettings | undefined,
+): boolean {
+  const x = a ?? {};
+  const y = b ?? {};
+  return x.enforced === y.enforced && x.minOrders === y.minOrders && x.lowOrders === y.lowOrders;
+}
+
+/**
+ * The config to write when this page's `draft` was edited from `base` while the server moved
+ * on to `latest` (another admin saved meanwhile). Config `driverWallet` is written whole, so a
+ * plain save would silently undo their edits; instead only what this page changed — each
+ * global value, each region — is laid over `latest`, and everything else stays theirs. When
+ * both touched the same value, this save wins, as it would have anyway.
+ */
+export function mergeWalletConfig(
+  base: WalletConfig,
+  draft: WalletConfig,
+  latest: WalletConfig,
+): WalletConfig {
+  const next: WalletConfig = { ...latest, regions: { ...latest.regions } };
+  if (draft.enforced !== base.enforced) next.enforced = draft.enforced;
+  if (draft.minOrders !== base.minOrders) next.minOrders = draft.minOrders;
+  if (draft.lowOrders !== base.lowOrders) next.lowOrders = draft.lowOrders;
+
+  const ids = new Set([...Object.keys(base.regions), ...Object.keys(draft.regions)]);
+  for (const id of ids) {
+    if (sameRegion(base.regions[id], draft.regions[id])) continue;
+    if (draft.regions[id]) next.regions[id] = draft.regions[id];
+    else delete next.regions[id];
+  }
+  return next;
 }

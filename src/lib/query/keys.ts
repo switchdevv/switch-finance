@@ -53,6 +53,9 @@ export const queryKeys = {
     all: ['drivers'] as const,
     list: () => ['drivers', 'list'] as const,
     detail: (objectId: string) => ['drivers', 'detail', objectId] as const,
+    /** Every order a driver was on in a period — the Finance tab, its sheet and statement. */
+    orders: (driverId: string, range: RangeKey) =>
+      ['drivers', 'orders', driverId, range] as const,
   },
   /** Drivers' wallets (D-25). Every recording invalidates `all`: a top-up moves the list's
    * figures and the ledger alike. */
