@@ -9,7 +9,7 @@ import { useAccess } from '@/hooks/use-access';
 import type { MessageKey } from '@/lib/i18n/dictionary';
 import { useI18n } from '@/lib/i18n/provider';
 import { BrandMark } from './brand-mark';
-import { DashboardIcon, LogOutIcon, ShieldIcon, StoreIcon } from './icons';
+import { BikeIcon, DashboardIcon, LogOutIcon, ShieldIcon, StoreIcon } from './icons';
 import { LanguageToggle } from './language-toggle';
 import { ThemeToggle } from './theme-toggle';
 
@@ -25,6 +25,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'nav.dashboard', icon: DashboardIcon },
   { href: '/restaurants', label: 'nav.restaurants', icon: StoreIcon },
+  { href: '/drivers', label: 'nav.drivers', icon: BikeIcon },
   { href: '/access', label: 'nav.access', icon: ShieldIcon, adminOnly: true },
 ];
 

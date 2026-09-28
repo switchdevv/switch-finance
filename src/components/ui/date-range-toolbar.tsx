@@ -61,7 +61,7 @@ export function DateRangeToolbar({
   );
 }
 
-function DateInput({
+export function DateInput({
   label,
   value,
   min,

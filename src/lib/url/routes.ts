@@ -42,3 +42,18 @@ export function restaurantInvoiceHref(
   if (options) writeInvoiceOptions(params, options);
   return `${INVOICE_PATH}?${params.toString()}`;
 }
+
+export const DRIVERS_HREF = '/drivers';
+const DRIVER_DETAIL_PATH = '/drivers/detail';
+
+/** The driver the current URL is about, or '' when the link was malformed. */
+export function readDriverId(params: ReadableParams): string {
+  return params.get('id')?.trim() ?? '';
+}
+
+/** Like `restaurantDetailHref`: `backHref` is the drivers list exactly as it was left. */
+export function driverDetailHref(objectId: string, backHref?: string): string {
+  const params = new URLSearchParams({ id: objectId });
+  if (backHref) params.set('back', backHref);
+  return `${DRIVER_DETAIL_PATH}?${params.toString()}`;
+}

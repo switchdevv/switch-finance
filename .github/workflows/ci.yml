@@ -1,5 +1,6 @@
-# Checks every pull request. deploy-staging.yml calls it again before each staging deploy and then
-# deploys the exact out/ built here (`upload-build`).
+# Checks every pull request, both bundles: staging (.env.staging) and production (.env.prod).
+# deploy-staging.yml and deploy-production.yml call it again, for their own bundle only, and then
+# deploy the exact out/ built here (`upload-build`).
 name: ci
 
 on:
@@ -10,6 +11,10 @@ on:
         description: Upload out/ as the `web-build` artifact for the deploy job.
         type: boolean
         default: false
+      target:
+        description: The bundle to build, staging or production (pull requests check both).
+        type: string
+        default: staging
 
 permissions:
   contents: read
@@ -26,7 +31,11 @@ concurrency:
 
 jobs:
   check:
+    name: check (${{ matrix.target }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: ${{ fromJSON(github.event_name == 'pull_request' && '["staging","production"]' || format('["{0}"]', inputs.target)) }}
     timeout-minutes: 15
     env:
       NEXT_TELEMETRY_DISABLED: 1
@@ -38,12 +47,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
-      # The staging bundle, built with .env.staging. `next build` type-checks as it goes, and the
-      # script then refuses a bundle that contains a production value.
-      - run: npm run build:staging
+      # The bundle, built with .env.staging or .env.prod. `next build` type-checks as it goes, and
+      # the script then refuses a staging bundle that contains a production value, or a production
+      # bundle that names a staging or local server.
+      - run: npm run build:${{ matrix.target }}
       # Report only: `ws` is the Parse SDK's Node transport and never reaches the browser, and
       # exceljs calls `uuid` without the caller buffer its advisory needs. A red audit would
-      # block every staging deploy.
+      # block every deploy.
       - name: Audit production dependencies (report only)
         continue-on-error: true
         run: npm audit --omit=dev --audit-level=high

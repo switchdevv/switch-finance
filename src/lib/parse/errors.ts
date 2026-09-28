@@ -64,3 +64,55 @@ function getErrorCode(error: unknown): number | undefined {
   }
   return undefined;
 }
+
+/**
+ * The wallet functions' own refusals (switch-server-v2 D-25), named by message: the same
+ * code covers several of them (142 is every refused operation), and the message is the
+ * contract — see docs/driver-wallet-backend.md §4.
+ */
+const WALLET_MESSAGES = {
+  WALLET_INVALID_PARAMS: 'wallet.errors.invalidParams',
+  WALLET_DRIVER_NOT_FOUND: 'wallet.errors.driverNotFound',
+  WALLET_NOT_STARTED: 'wallet.errors.notStarted',
+  WALLET_ENTRY_NOT_FOUND: 'wallet.errors.entryNotFound',
+  WALLET_NOT_A_DRIVER: 'wallet.errors.notADriver',
+  WALLET_NO_CITY: 'wallet.errors.noCity',
+  WALLET_NO_SERVICE_FEE: 'wallet.errors.noServiceFee',
+  WALLET_NOTHING_TO_REFUND: 'wallet.errors.nothingToRefund',
+  WALLET_REFUND_EXCEEDS_BALANCE: 'wallet.errors.refundExceedsBalance',
+  WALLET_REQUEST_REUSED: 'wallet.errors.requestReused',
+  WALLET_ENTRY_VOIDED: 'wallet.errors.entryVoided',
+  WALLET_ENTRY_NOT_VOIDABLE: 'wallet.errors.entryNotVoidable',
+  ADMIN_REQUIRED: 'wallet.errors.adminOnly',
+  FINANCE_REQUIRED: 'errors.forbidden',
+} as const satisfies Record<string, MessageKey>;
+
+/**
+ * Maps a wallet call's failure to its copy. A 141 whose message is Parse's own "Invalid
+ * function" means the server doesn't have the wallet functions yet (legacy, before v2
+ * serves production) — told apart from any other 141 by the message, as switch-ops does
+ * (its src/lib/parse/errors.ts), because 141 is also what a function throwing anything
+ * that isn't a Parse.Error answers.
+ */
+export function walletErrorKey(error: unknown): MessageKey {
+  const message = getErrorMessage(error);
+  if (getErrorCode(error) === 141 && /invalid function/i.test(message ?? '')) {
+    return 'wallet.errors.notDeployed';
+  }
+  if (message && message in WALLET_MESSAGES) {
+    return WALLET_MESSAGES[message as keyof typeof WALLET_MESSAGES];
+  }
+  return parseErrorKey(error, 'fetch');
+}
+
+function getErrorMessage(error: unknown): string | undefined {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof (error as { message: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+  return undefined;
+}

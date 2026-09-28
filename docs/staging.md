@@ -5,7 +5,7 @@ seeded test data), published at **https://switchfood-staging-finance.web.app**. 
 exports and invoices there on test orders without touching production.
 
 Nothing here deploys to production. No workflow can: the deploy identity only exists in the
-staging project. Production is still `npm run deploy` from your machine, as before.
+staging project. Production has its own manual workflow and guide: [production.md](production.md).
 
 ---
 
@@ -29,7 +29,7 @@ flowchart LR
   `firebase.json` that names the staging site (`SITE` in the workflow), so both sites always get
   the same headers and URL rules.
 - GitHub holds no Google key. The deploy signs in with Workload Identity Federation, which Google
-  only accepts from this repository's `stg` branch. `main` is kept for production later.
+  only accepts from this repository's `stg` branch. `main` is production's ([production.md](production.md)).
 
 ### What staging uses
 
@@ -127,8 +127,9 @@ When it is green, open https://switchfood-staging-finance.web.app and sign in as
 with the staging seed password. In DevTools → Network, requests go to
 `switchfood-staging.oa.r.appspot.com`, never `api.switchfood.net`.
 
-`npm run build:staging` leaves a staging bundle in `out/`. `npm run deploy` rebuilds before it
-publishes, so that's harmless; never run a bare `firebase deploy` after a staging build.
+`npm run build:staging` leaves a staging bundle in `out/`. Never run a bare `firebase deploy`
+after it: that would publish the staging bundle to the production site. Production deploys are
+the deploy-production workflow ([production.md](production.md)).
 
 ---
 

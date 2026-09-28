@@ -43,6 +43,7 @@ export function makeFormatters(locale: Locale) {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   });
+  const twoDecimals = new Intl.NumberFormat(tag, { maximumFractionDigits: 2 });
   // `style: 'percent'` rather than a '%' glued on: French sets the sign apart with a
   // no-break space ("15 %"), English doesn't ("15%").
   const percent = new Intl.NumberFormat(tag, { style: 'percent', maximumFractionDigits: 2 });
@@ -81,6 +82,9 @@ export function makeFormatters(locale: Locale) {
 
     /** A rating: '4.3' / '4,3'. */
     decimal: (value: number) => oneDecimal.format(value),
+
+    /** Orders held in a driver's wallet, stored in hundredths: 1260 → '12.6' / '12,6'. */
+    orders: (units: number) => twoDecimals.format(units / 100),
 
     /**
      * Money as the RN apps write it: amount then symbol, e.g. `1,250 DA` / `1 250 DA`. Not

@@ -272,6 +272,53 @@ export function BagIcon(props: IconProps) {
   );
 }
 
+export function WalletIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H17a1.5 1.5 0 0 1 1.5 1.5V8" />
+      <path d="M4 7.5V17a2.5 2.5 0 0 0 2.5 2.5h12A1.5 1.5 0 0 0 20 18v-8.5A1.5 1.5 0 0 0 18.5 8H6.5A2.5 2.5 0 0 1 4 7.5Z" />
+      <path d="M16 13.75h.01" strokeWidth={2.5} />
+    </Icon>
+  );
+}
+
+export function PlusIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  );
+}
+
+/** A refund: money going back the way it came. */
+export function RefundIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9 14 4.5 9.5 9 5" />
+      <path d="M4.5 9.5H14a5.5 5.5 0 0 1 0 11h-3" />
+    </Icon>
+  );
+}
+
+export function SlidersIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+      <circle cx="15" cy="7" r="2" />
+      <circle cx="9" cy="17" r="2" />
+    </Icon>
+  );
+}
+
+export function BanIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m6 6 12 12" />
+    </Icon>
+  );
+}
+
 /** The mark used in the sidebar and on the login card — an "S" cut from a rounded
  * square, drawn in the caller's colour so it works on the brand gradient and on a
  * plain surface alike. */

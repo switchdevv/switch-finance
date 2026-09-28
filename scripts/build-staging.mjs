@@ -16,7 +16,7 @@ import { extname, join } from 'node:path';
 // sends testers' requests, sign-ins and dispatches to production.
 const PRODUCTION_VALUES = [
   'api.switchfood.net', // the production Parse server
-  'b4cb8ea88897dba8ec3b', // the production Pusher key
+  '337b658e660ec3f09bd3', // the production Pusher key
 ];
 
 const ENV_FILE = '.env.staging';

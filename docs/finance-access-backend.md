@@ -207,6 +207,11 @@ client narrows every `_User` query with `select` to
 `username, fullname, email, appType, staffType, financeAccess, enabled`
 (`src/lib/services/staff.ts`), so nothing beyond those fields is requested.
 
+The Drivers page (`src/lib/services/drivers.ts`) also reads the accounts whose `appType` holds
+`driver`, narrowed to `username, fullname, phone, picture, appType, enabled, city,
+driverActive`. Their wallets are not on `_User` at all: see
+[driver-wallet-backend.md](driver-wallet-backend.md).
+
 ---
 
 ## 5. Bootstrap

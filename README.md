@@ -11,7 +11,7 @@ in; other staff need an admin to give them finance access.
 | Dashboard | http://localhost:3000 | https://switchfood-staging-finance.web.app | https://switch-finance.web.app |
 | Server | switch-server-v2 on your machine | switch-server-v2 on staging | `api.switchfood.net` |
 | Data | test data | test data | **real orders and restaurants** |
-| How it gets there | `npm run dev:local` | merge into `stg` | `npm run deploy`, by hand |
+| How it gets there | `npm run dev:local` | merge into `stg` | run deploy-production on `main` |
 
 ## Run it locally
 
@@ -65,12 +65,34 @@ out.
 If the change needs a server change too, ship the server to staging first (switch-server-v2's
 own `stg`), then the dashboard.
 
-**Production** is still deployed by hand with `npm run deploy`. A pipeline from `main` will come
-later.
+## Ship a change to production
+
+Production deploys only by hand, from `main`, once the change has been on staging:
+
+1. Merge `stg` into `main` through a pull request:
+
+   ```bash
+   gh pr create --base main --head stg --fill
+   ```
+
+2. Actions → **deploy-production** → Run workflow on `main`
+   (`gh workflow run deploy-production --ref main`). It runs the same checks, builds with
+   `.env.prod`, refuses a bundle that names staging or a local server, publishes it to
+   https://switch-finance.web.app and checks the site serves that commit.
+
+Ship the server change to production first (switch-server-v2's promote-production), then the
+dashboard. Until switch-server-v2 serves production, the Access switches answer "not on the
+server yet".
+
+Setup, release order, rollback and troubleshooting: [docs/production.md](docs/production.md).
 
 ## Good to know
 
 - Staging's one-time setup, rollback and troubleshooting: [docs/staging.md](docs/staging.md).
-- A new `NEXT_PUBLIC_*` setting needs its staging value in `.env.staging`, or the staging build
-  fails.
+- Production's setup, release order and rollback: [docs/production.md](docs/production.md).
+- A new `NEXT_PUBLIC_*` setting needs its staging value in `.env.staging` and its production
+  value in `.env.prod`, or the builds fail.
 - Totals are in Algiers time (a day runs from midnight to midnight in Algeria).
+- Drivers' prepaid wallets (the Drivers page) run on switch-server-v2's wallet functions; what
+  they do, their errors and the rollout order are in
+  [docs/driver-wallet-backend.md](docs/driver-wallet-backend.md).

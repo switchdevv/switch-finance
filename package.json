@@ -7,6 +7,7 @@
     "dev:local": "SWITCH_LOCAL=1 NEXT_PUBLIC_PARSE_SERVER_URL=http://localhost:1337 next dev -p 3000",
     "build": "next build",
     "build:staging": "node scripts/build-staging.mjs",
+    "build:production": "node scripts/build-production.mjs",
     "preview": "next build && firebase emulators:start --only hosting",
     "lint": "eslint",
     "deploy": "next build && firebase deploy --only hosting"

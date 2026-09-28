@@ -1,0 +1,138 @@
+# Production deploy. Manual only: Actions → deploy-production → Run workflow, on main. The ci
+# checks run, then the out/ they built with .env.prod goes live on the production Firebase Hosting
+# site, and the site is checked to serve this commit. Google only issues credentials to a manual
+# run from main of this repository. Setup, release order, rollback: docs/production.md.
+name: deploy-production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash # explicit: adds pipefail
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      upload-build: true
+      target: production
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation: GitHub holds no Google key
+    env:
+      # Repository variables (Settings → Secrets and variables → Actions → Variables).
+      PROJECT_ID: ${{ vars.PROD_GCP_PROJECT_ID }}
+      WIF_PROVIDER: ${{ vars.PROD_GCP_WIF_PROVIDER }}
+      DEPLOY_SA: ${{ vars.PROD_GCP_DEPLOY_SA }}
+      # The production Hosting site, in PROJECT_ID. firebase.json names it too; the preflight
+      # checks the two agree, so this deploy can't publish over another site of the project.
+      SITE: switch-finance
+      FIREBASE_TOOLS_VERSION: 15.29.0
+    steps:
+      - name: Check the branch and the repository variables
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::Production deploys only from main (this run is on $GITHUB_REF). Google refuses any other branch."
+            exit 1
+          fi
+          missing=""
+          [ -n "$PROJECT_ID" ] || missing="$missing PROD_GCP_PROJECT_ID"
+          [ -n "$WIF_PROVIDER" ] || missing="$missing PROD_GCP_WIF_PROVIDER"
+          [ -n "$DEPLOY_SA" ] || missing="$missing PROD_GCP_DEPLOY_SA"
+          if [ -n "$missing" ]; then
+            echo "::error::Set these repository variables:$missing (docs/production.md, step 3)."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+      - name: Get the build ci tested
+        uses: actions/download-artifact@v8
+        with:
+          name: web-build
+          path: out
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Preflight (the production server answers, the site in firebase.json)
+        id: preflight
+        run: |
+          server=$(sed -n 's/^NEXT_PUBLIC_PARSE_SERVER_URL=//p' .env.prod)
+          echo "server_url=$server" >> "$GITHUB_OUTPUT"
+          # Only /health: no sign-in, no API call.
+          if ! curl -s --max-time 20 "$server/health" | grep -q '"status":"ok"'; then
+            echo "::error::The production server $server didn't answer /health. Don't deploy into an outage: check switch-server-v2 first."
+            exit 1
+          fi
+          configured=$(jq -r '.hosting.site' firebase.json)
+          if [ "$configured" != "$SITE" ]; then
+            echo "::error::firebase.json names the site \"$configured\", this workflow \"$SITE\". Make them agree."
+            exit 1
+          fi
+          # What's live, for people and for the smoke test below.
+          jq -n --arg commit "$GITHUB_SHA" \
+            --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{commit: $commit, run: $run}' > out/version.json
+      - name: What is live now
+        id: before
+        run: |
+          live=$(curl -s --max-time 10 "https://$SITE.web.app/version.json" | jq -r '.commit // empty' || true)
+          echo "commit=${live:-unknown}" >> "$GITHUB_OUTPUT"
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.PROD_GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.PROD_GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.PROD_GCP_DEPLOY_SA }}
+      - name: Deploy to ${{ env.SITE }}
+        run: >
+          npx --yes "firebase-tools@$FIREBASE_TOOLS_VERSION" deploy --only hosting
+          --config firebase.json --project "$PROJECT_ID" --non-interactive
+          --message "prod ${GITHUB_SHA::7}, run $GITHUB_RUN_NUMBER"
+      - name: Smoke test
+        run: |
+          url="https://$SITE.web.app"
+          ok=""
+          for _ in $(seq 12); do
+            if curl -s --max-time 10 "$url/version.json" | grep -q "$GITHUB_SHA"; then
+              ok=1
+              break
+            fi
+            echo "$url doesn't serve this commit yet"
+            sleep 5
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::$url never served this commit's version.json. See the deploy step's output."
+            exit 1
+          fi
+          curl -sS --fail --max-time 20 -o /dev/null "$url/login"
+          echo "$url serves $GITHUB_SHA"
+      - name: Summary
+        if: always()
+        env:
+          STATUS: ${{ job.status }}
+          SERVER_URL: ${{ steps.preflight.outputs.server_url }}
+          BEFORE: ${{ steps.before.outputs.commit }}
+        run: |
+          {
+            echo "### Production deploy: $STATUS"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Site | https://$SITE.web.app |"
+            echo "| Commit | \`$GITHUB_SHA\` |"
+            echo "| Before | \`${BEFORE:-unknown}\` |"
+            echo "| Server | ${SERVER_URL:-n/a} |"
+            echo
+            echo "Roll back: Firebase console → project \`$PROJECT_ID\` → Hosting → \`$SITE\` → Release history → ⋮ → Roll back. Or re-run the deploy-production run of the previous commit."
+          } >> "$GITHUB_STEP_SUMMARY"

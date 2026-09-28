@@ -49,6 +49,21 @@ export const queryKeys = {
     range: (restaurantId: string, range: RangeKey, scope: OrderScope) =>
       ['orders', 'range', restaurantId, range, scope] as const,
   },
+  drivers: {
+    all: ['drivers'] as const,
+    list: () => ['drivers', 'list'] as const,
+    detail: (objectId: string) => ['drivers', 'detail', objectId] as const,
+  },
+  /** Drivers' wallets (D-25). Every recording invalidates `all`: a top-up moves the list's
+   * figures and the ledger alike. */
+  wallets: {
+    all: ['wallets'] as const,
+    list: () => ['wallets', 'list'] as const,
+    detail: (driverId: string, range: RangeKey) => ['wallets', 'detail', driverId, range] as const,
+    /** A refund's amount before it is recorded; `null` orders = all of them. */
+    refundPreview: (driverId: string, orders: number | null) =>
+      ['wallets', 'refundPreview', driverId, orders] as const,
+  },
   foods: {
     all: ['foods'] as const,
     /** The dishes a range's orders reference and the menu sections they sit in — the
